@@ -1,0 +1,12 @@
+{
+  "model_source": "retrain",
+  "prediction_pearson_vs_reference": 0.9325126218255467,
+  "prediction_spearman_vs_reference": 0.9015508880670244,
+  "reference_score": -0.032067156669723915,
+  "retrained_score": -0.02422534325719072,
+  "score_difference_vs_reference": 0.007841813412533195,
+  "selected_score": -0.02422534325719072,
+  "supplemental_dates": 135,
+  "supplemental_rows": 269869,
+  "train_rows": 2332267
+}

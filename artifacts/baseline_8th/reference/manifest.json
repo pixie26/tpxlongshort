@@ -1,0 +1,73 @@
+{
+  "baseline": "JPX competition 8th-place minimally adapted local runner",
+  "categorical_features": [
+    "SecuritiesCode",
+    "SupervisionFlag"
+  ],
+  "command": "baselines\\8th\\run_baseline.py --data-dir data\\raw\\jpx --output-dir artifacts\\baseline_8th\\reference --model-source reference",
+  "data_dir": "D:\\projects\\jpx\\data\\raw\\jpx",
+  "elapsed_seconds": 166.3054141998291,
+  "features": [
+    "SecuritiesCode",
+    "Open",
+    "High",
+    "Low",
+    "Close",
+    "Volume",
+    "AdjustmentFactor",
+    "ExpectedDividend",
+    "SupervisionFlag",
+    "Amplitude",
+    "OpenCloseReturn",
+    "Return",
+    "Volatility10",
+    "Volatility30",
+    "Volatility50",
+    "CloseSMA3",
+    "CloseSMA5",
+    "CloseSMA10",
+    "CloseSMA30",
+    "ReturnSMA3",
+    "ReturnSMA5",
+    "ReturnSMA10",
+    "ReturnSMA30"
+  ],
+  "input_sha256": {
+    "D:\\projects\\jpx\\baselines\\8th\\lgbm.pickle": "9e04e9735083ec7427751d06fff4599a66007cf3569d11f1558721c112f65479",
+    "D:\\projects\\jpx\\data\\raw\\jpx\\supplemental_files\\stock_prices.csv": "c123476ed737e153d27c095edd35a08415c1dc29a77b60faf2ca98775af8909b",
+    "D:\\projects\\jpx\\data\\raw\\jpx\\train_files\\stock_prices.csv": "bf774a86f834e5338bba74f2356ebb750f93a1cc4e89b064ee07251e8ed851db"
+  },
+  "metrics": {
+    "model_source": "reference",
+    "reference_score": -0.032067156669723915,
+    "selected_score": -0.032067156669723915,
+    "supplemental_dates": 135,
+    "supplemental_rows": 269869
+  },
+  "model_source": "reference",
+  "output_dir": "D:\\projects\\jpx\\artifacts\\baseline_8th\\reference",
+  "output_sha256": {
+    "daily_spread.csv": "8697d47d829f4b16595ca7cf0c249ee31b3f9ce4d4ad592bb60df77d7b6efa60",
+    "model.pickle": "9e04e9735083ec7427751d06fff4599a66007cf3569d11f1558721c112f65479",
+    "predictions.parquet": "ace289ced0e24563aa241415c37585e66696dda8bd0f5c9dcf47c6c923160d46"
+  },
+  "upstream_sha256_before_and_after": {
+    "Features.py": "b1a9e493df5983fa27b06f6c263bf5942b24a4354f4987f72e23c63d32d2e631",
+    "Preprocessing.py": "a7a7cc8b177321e91bb78231a3e4d282180f22a1dd655257b13a42aa48286278",
+    "README.md": "2d839fe701a041f4c544334922fd29a4af024bc297e1bb19f29b31480b60801f",
+    "Trackers.py": "49633c6ed84802f528ed8d73ed96aa864317e96ba54a6e2720361d95b70ea56d",
+    "TrainingNotebook.ipynb": "afbda49f3b51517b01c04c3a302f722f27c77ac58025bb482dbb473230fd275a",
+    "Validation.py": "a35d25ff4e8b3833663d772b896118167a48af81ed85fdfed7671849cd03accd",
+    "images/figure.png": "4138c6726b65e37745d91c639d0a8d0bf9406eb89ed30485192762dee04d22bf",
+    "jpx-submission-template.ipynb": "9d00bb40fe84509989ca8d0446e84349206c3ccf411c0793f961f56c4a864d74",
+    "lgbm.pickle": "9e04e9735083ec7427751d06fff4599a66007cf3569d11f1558721c112f65479"
+  },
+  "versions": {
+    "lightgbm": "4.6.0",
+    "numpy": "2.1.3",
+    "pandas": "2.2.3",
+    "pyarrow": "19.0.0",
+    "python": "3.13.5",
+    "scikit-learn": "1.6.1"
+  }
+}

@@ -1,0 +1,11 @@
+# Immutable local competition data
+/data/raw/
+
+# Upstream reference repository (kept as a separate checkout)
+/JPXTokyoStockExchangePrediction/
+
+# Python and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
