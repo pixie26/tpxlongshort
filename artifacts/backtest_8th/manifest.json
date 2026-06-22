@@ -1,0 +1,253 @@
+{
+  "annualization_days": 252,
+  "command": "baselines\\8th\\run_backtest.py --data-dir data\\raw\\jpx --baseline-artifacts-dir artifacts\\baseline_8th --output-dir artifacts\\backtest_8th --cost-bps 0 15",
+  "cost_bps": [
+    0.0,
+    15.0
+  ],
+  "cost_definition": "turnover * cost_bps / 10000",
+  "elapsed_seconds": 4.3354291915893555,
+  "inputs": {
+    "model_reference": {
+      "path": "D:\\projects\\jpx\\artifacts\\baseline_8th\\reference\\model.pickle",
+      "sha256": "9e04e9735083ec7427751d06fff4599a66007cf3569d11f1558721c112f65479",
+      "size": 1209345
+    },
+    "model_retrain": {
+      "path": "D:\\projects\\jpx\\artifacts\\baseline_8th\\retrain\\model.pickle",
+      "sha256": "ebd6398a9f8e1c51310a14079faf76a739ac3185bba98f5781d5297bb9fcbeee",
+      "size": 1255696
+    },
+    "prediction_source_Features.py": {
+      "path": "D:\\projects\\jpx\\baselines\\8th\\Features.py",
+      "sha256": "ed3bc63164671205c00158ec10fe3ba7a448ddd10925301ef0097079756f030e",
+      "size": 5575
+    },
+    "prediction_source_Preprocessing.py": {
+      "path": "D:\\projects\\jpx\\baselines\\8th\\Preprocessing.py",
+      "sha256": "ea1b80db4166f5d766a2b7e8abb8ad70ae77fa9f5a7009fa947aa1eb70e6e83e",
+      "size": 1951
+    },
+    "prediction_source_Trackers.py": {
+      "path": "D:\\projects\\jpx\\baselines\\8th\\Trackers.py",
+      "sha256": "49633c6ed84802f528ed8d73ed96aa864317e96ba54a6e2720361d95b70ea56d",
+      "size": 17057
+    },
+    "prediction_source_run_backtest.py": {
+      "path": "D:\\projects\\jpx\\baselines\\8th\\run_backtest.py",
+      "sha256": "9668ed82ab766207186346bf01a6596eba0dce5a2cd368b3439f3bda35f5f57c",
+      "size": 16758
+    },
+    "prediction_source_run_baseline.py": {
+      "path": "D:\\projects\\jpx\\baselines\\8th\\run_baseline.py",
+      "sha256": "ce1b01e2c4e157e94c1bbd79198428597df1389e66bb7e9e0e9b27a4467bc208",
+      "size": 11847
+    },
+    "supplemental_predictions_reference": {
+      "path": "D:\\projects\\jpx\\artifacts\\baseline_8th\\reference\\predictions.parquet",
+      "sha256": "ace289ced0e24563aa241415c37585e66696dda8bd0f5c9dcf47c6c923160d46",
+      "size": 4186726
+    },
+    "supplemental_predictions_retrain": {
+      "path": "D:\\projects\\jpx\\artifacts\\baseline_8th\\retrain\\predictions.parquet",
+      "sha256": "0d81b2cff2204b65bfca29dedb7471f736758659d85b9c913af51ab921187f19",
+      "size": 4198142
+    },
+    "train": {
+      "path": "D:\\projects\\jpx\\data\\raw\\jpx\\train_files\\stock_prices.csv",
+      "sha256": "bf774a86f834e5338bba74f2356ebb750f93a1cc4e89b064ee07251e8ed851db",
+      "size": 217603723
+    }
+  },
+  "name": "JPX 8th-place daily long-short backtest",
+  "outputs": {
+    "daily_portfolio.csv": "8b4a5cf17cbbc597dc1fb741b453c7d8444e754cadb508055d4402e6fcb4dcde",
+    "portfolio_positions.parquet": "36efe77c2b5ca44f7c6ad1b1b2dc851d7104496e7ad6325ffb3773e02df0c2bf",
+    "report.html": "86c363d7092e7ec7cd06d5053f875dab26e9b91e1cafbb2f64b4809c14a5f27d",
+    "summary.csv": "f49089e5654dd077e528b9faa2fccc017f2343df476d992f3fb2c0bd89c3e516"
+  },
+  "period_interpretation": {
+    "Supplemental (OOS proxy)": "Held-out competition supplemental interval; proxy only",
+    "Training (in-sample)": "Full-period fitted-model backcast; descriptive only"
+  },
+  "portfolio_size_per_side": 200,
+  "summary": [
+    {
+      "annualized_arithmetic_return": 1.2669644257940036,
+      "annualized_cost_drag": 0.0,
+      "annualized_return": 2.531333559297466,
+      "annualized_volatility": 0.06562398023785194,
+      "average_daily_turnover": 0.373674980508984,
+      "average_gross_exposure": 1.0,
+      "average_names": 400.0,
+      "average_net_exposure": 4.5099923980262245e-21,
+      "cost_bps": 0.0,
+      "end_date": "2021-12-03",
+      "ending_equity": 410.75307500462765,
+      "hit_rate": 0.9525790349417638,
+      "max_drawdown": -0.008810347985301226,
+      "model": "reference",
+      "period": "Training (in-sample)",
+      "sharpe": 19.306424590552616,
+      "start_date": "2017-01-04",
+      "total_return": 409.75307500462765,
+      "trading_days": 1202
+    },
+    {
+      "annualized_arithmetic_return": 1.1258327949275246,
+      "annualized_cost_drag": 0.1411316308664788,
+      "annualized_return": 2.0687559332663112,
+      "annualized_volatility": 0.06462159057109156,
+      "average_daily_turnover": 0.373674980508984,
+      "average_gross_exposure": 1.0,
+      "average_names": 400.0,
+      "average_net_exposure": 4.5099923980262245e-21,
+      "cost_bps": 15.0,
+      "end_date": "2021-12-03",
+      "ending_equity": 210.2485986620184,
+      "hit_rate": 0.9267886855241264,
+      "max_drawdown": -0.009922959958000965,
+      "model": "reference",
+      "period": "Training (in-sample)",
+      "sharpe": 17.421929497216144,
+      "start_date": "2017-01-04",
+      "total_return": 209.2485986620184,
+      "trading_days": 1202
+    },
+    {
+      "annualized_arithmetic_return": 1.281829242252214,
+      "annualized_cost_drag": 0.0,
+      "annualized_return": 2.584241323030028,
+      "annualized_volatility": 0.06435138187931004,
+      "average_daily_turnover": 0.36947203405314105,
+      "average_gross_exposure": 1.0,
+      "average_names": 400.0,
+      "average_net_exposure": -3.53583404005256e-20,
+      "cost_bps": 0.0,
+      "end_date": "2021-12-03",
+      "ending_equity": 440.9474621389566,
+      "hit_rate": 0.9534109816971714,
+      "max_drawdown": -0.00608650021770718,
+      "model": "retrain",
+      "period": "Training (in-sample)",
+      "sharpe": 19.9192185904611,
+      "start_date": "2017-01-04",
+      "total_return": 439.9474621389566,
+      "trading_days": 1202
+    },
+    {
+      "annualized_arithmetic_return": 1.1422850034207856,
+      "annualized_cost_drag": 0.13954423883142836,
+      "annualized_return": 2.119683881621944,
+      "annualized_volatility": 0.0633357266134836,
+      "average_daily_turnover": 0.36947203405314105,
+      "average_gross_exposure": 1.0,
+      "average_names": 400.0,
+      "average_net_exposure": -3.53583404005256e-20,
+      "cost_bps": 15.0,
+      "end_date": "2021-12-03",
+      "ending_equity": 227.42022225993222,
+      "hit_rate": 0.9351081530782029,
+      "max_drawdown": -0.007146239215386707,
+      "model": "retrain",
+      "period": "Training (in-sample)",
+      "sharpe": 18.035397468347725,
+      "start_date": "2017-01-04",
+      "total_return": 226.42022225993222,
+      "trading_days": 1202
+    },
+    {
+      "annualized_arithmetic_return": -0.055498100890999574,
+      "annualized_cost_drag": 0.0,
+      "annualized_return": -0.059534632675379506,
+      "annualized_volatility": 0.10902281666943192,
+      "average_daily_turnover": 0.3139329733243331,
+      "average_gross_exposure": 1.0,
+      "average_names": 400.0,
+      "average_net_exposure": -1.6062254407192657e-20,
+      "cost_bps": 0.0,
+      "end_date": "2022-06-24",
+      "ending_equity": 0.967652361979394,
+      "hit_rate": 0.45925925925925926,
+      "max_drawdown": -0.08638048309962232,
+      "model": "reference",
+      "period": "Supplemental (OOS proxy)",
+      "sharpe": -0.5090503308062143,
+      "start_date": "2021-12-06",
+      "total_return": -0.03234763802060603,
+      "trading_days": 135
+    },
+    {
+      "annualized_arithmetic_return": -0.17328575248228936,
+      "annualized_cost_drag": 0.1177876515912898,
+      "annualized_return": -0.1640435826533606,
+      "annualized_volatility": 0.10856723044661122,
+      "average_daily_turnover": 0.3139329733243331,
+      "average_gross_exposure": 1.0,
+      "average_names": 400.0,
+      "average_net_exposure": -1.6062254407192657e-20,
+      "cost_bps": 15.0,
+      "end_date": "2022-06-24",
+      "ending_equity": 0.9084743338693773,
+      "hit_rate": 0.4,
+      "max_drawdown": -0.1132551617460068,
+      "model": "reference",
+      "period": "Supplemental (OOS proxy)",
+      "sharpe": -1.5961147002594305,
+      "start_date": "2021-12-06",
+      "total_return": -0.09152566613062274,
+      "trading_days": 135
+    },
+    {
+      "annualized_arithmetic_return": -0.04197459724743688,
+      "annualized_cost_drag": 0.0,
+      "annualized_return": -0.04673932746544207,
+      "annualized_volatility": 0.10914813713866173,
+      "average_daily_turnover": 0.3242747318682967,
+      "average_gross_exposure": 1.0,
+      "average_names": 400.0,
+      "average_net_exposure": 7.54925957138055e-20,
+      "cost_bps": 0.0,
+      "end_date": "2022-06-24",
+      "ending_equity": 0.9746830149025264,
+      "hit_rate": 0.48148148148148145,
+      "max_drawdown": -0.08426052702004472,
+      "model": "retrain",
+      "period": "Supplemental (OOS proxy)",
+      "sharpe": -0.3845654021022125,
+      "start_date": "2021-12-06",
+      "total_return": -0.0253169850974736,
+      "trading_days": 135
+    },
+    {
+      "annualized_arithmetic_return": -0.16364247664442175,
+      "annualized_cost_drag": 0.12166787939698495,
+      "annualized_return": -0.15594782560655185,
+      "annualized_volatility": 0.1086851128590609,
+      "average_daily_turnover": 0.3242747318682967,
+      "average_gross_exposure": 1.0,
+      "average_names": 400.0,
+      "average_net_exposure": 7.54925957138055e-20,
+      "cost_bps": 15.0,
+      "end_date": "2022-06-24",
+      "ending_equity": 0.9131770292880607,
+      "hit_rate": 0.42962962962962964,
+      "max_drawdown": -0.1147455268388009,
+      "model": "retrain",
+      "period": "Supplemental (OOS proxy)",
+      "sharpe": -1.505656776164254,
+      "start_date": "2021-12-06",
+      "total_return": -0.08682297071193934,
+      "trading_days": 135
+    }
+  ],
+  "turnover_definition": "0.5 * sum(abs(weight_t - weight_t_minus_1)); first date set to zero",
+  "versions": {
+    "lightgbm": "4.6.0",
+    "numpy": "2.1.3",
+    "pandas": "2.2.3",
+    "pyarrow": "19.0.0",
+    "python": "3.13.5",
+    "scikit-learn": "1.6.1"
+  }
+}
