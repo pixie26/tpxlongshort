@@ -160,6 +160,16 @@ jpx8 --config configs/walk_forward.yaml qlib-walk-forward
 jpx8 --config configs/walk_forward.yaml portfolio-backtest
 ```
 
+在不重训模型的前提下，对冻结的 stitched OOS 组合做多空归因、分侧成本、
+换手拆解、持仓延续率和 universe-relative beta 诊断：
+
+```powershell
+jpx8 --config configs/walk_forward.yaml portfolio-diagnostics
+```
+
+产物写入 `outputs/walk_forward/portfolio_diagnostics/`。该命令属于 2A
+诊断，不引入 TOPIX、真实市值或借券可得性假设。
+
 必须先运行 Native，再运行 Qlib。结果保存在 `outputs/walk_forward/`；每折包含模型、
 预测、排名、daily spread、metrics 和 Native/Qlib prediction parity。根目录包含
 2019 H2 至 2021 H2 的 stitched OOS 预测、年度诊断和合并汇总。
@@ -237,3 +247,45 @@ complete histories:
 ```powershell
 jpx8 --config configs/baseline.yaml feature-parity
 ```
+
+## Controlled portfolio experiments
+
+Run:
+
+```powershell
+jpx8 --config configs/walk_forward.yaml strategy-experiments
+```
+
+This command does not retrain LightGBM. It regenerates each fold's validation
+predictions from the frozen Native model, selects portfolio rules using only
+that validation segment, and applies the selected rule to the existing frozen
+test predictions. Diagnostic controls include long-only, 75/25 long-short,
+Top/Bottom concentration, equal weighting, slower rebalancing, buffers,
+minimum holding periods, prediction smoothing, turnover controls, and a
+universe-beta-neutral variant.
+
+### Controlled experiment findings
+
+All figures below use a 5 bps one-way cost on actual traded notional.
+
+| Rule | Net Sharpe | Average traded notional | Break-even cost |
+| --- | ---: | ---: | ---: |
+| Baseline 50/50 | -0.995 | 0.823 | 2.22 bps |
+| Long-only Top 200 | 0.350 | 0.761 | 9.55 bps |
+| 75% Long / 25% Short | 0.106 | 0.792 | 5.74 bps |
+| Prediction smoothing 3 days | 0.227 | 0.418 | 6.34 bps |
+| Prediction smoothing 5 days | 0.183 | 0.294 | 6.61 bps |
+| Buffer 150/250 + smoothing 3 days + no-trade band | 0.314 | 0.335 | 7.38 bps |
+| Strict nested-selected | -0.686 | 0.593 | 2.42 bps |
+
+The fixed smoothing results are stitched-test diagnostics, not validated
+parameter choices. Strict nested walk-forward selection remained negative
+because validation winners did not transfer consistently to the following test
+segments. Smoothing is the strongest next candidate; buffer alone reduces
+turnover but does not reliably preserve enough gross alpha. Mechanical 2-day
+and 5-day rebalancing also reduced gross performance.
+
+Detailed reports:
+
+- `outputs/walk_forward/portfolio_diagnostics/portfolio_diagnostics.html`
+- `outputs/walk_forward/strategy_experiments/strategy_experiments.html`

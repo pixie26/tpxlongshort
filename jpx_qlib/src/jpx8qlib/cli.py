@@ -9,10 +9,12 @@ import pandas as pd
 
 from .config import load_config
 from .data import load_raw_stock_prices, prepare_panel, select_parity_sample
+from .diagnostics import run_portfolio_diagnostics
 from .features import build_legacy_optimized_features
 from .legacy import build_legacy_features
 from .parity import compare_frames, compare_predictions, write_report
 from .portfolio import run_portfolio_backtest
+from .strategy_experiments import run_strategy_experiments
 from .workflow import run_native, run_qlib
 from .walk_forward import run_walk_forward
 
@@ -94,6 +96,14 @@ def _parser() -> argparse.ArgumentParser:
         "portfolio-backtest",
         help="Backtest frozen stitched OOS predictions as a market-neutral portfolio",
     )
+    sub.add_parser(
+        "portfolio-diagnostics",
+        help="Attribute sides, turnover, retention, and universe-relative performance",
+    )
+    sub.add_parser(
+        "strategy-experiments",
+        help="Run controlled portfolio rules with nested walk-forward selection",
+    )
 
     sub.add_parser(
         "feature-parity",
@@ -155,6 +165,18 @@ def main() -> None:
     elif args.command == "portfolio-backtest":
         print(json.dumps(
             run_portfolio_backtest(cfg),
+            indent=2,
+            allow_nan=True,
+        ))
+    elif args.command == "portfolio-diagnostics":
+        print(json.dumps(
+            run_portfolio_diagnostics(cfg),
+            indent=2,
+            allow_nan=True,
+        ))
+    elif args.command == "strategy-experiments":
+        print(json.dumps(
+            run_strategy_experiments(cfg),
             indent=2,
             allow_nan=True,
         ))

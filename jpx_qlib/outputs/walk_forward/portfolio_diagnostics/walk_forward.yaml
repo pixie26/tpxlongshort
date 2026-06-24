@@ -53,17 +53,6 @@ portfolio_diagnostics:
   core_n: 50
   boundary_band: 50
 
-strategy_experiments:
-  output_subdir: strategy_experiments
-  cost_bps: 5
-  turnover_lambda: 0.5
-  turnover_ratio_limit: 0.9
-  gross_sharpe_tolerance: 0.25
-  required_break_even_bps: 5
-  beta_lookback: 60
-  beta_min_periods: 20
-  beta_gross_bounds: [0.25, 0.75]
-
 walk_forward:
   purge_days: 2
   folds:

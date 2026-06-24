@@ -143,12 +143,12 @@ def daily_portfolio_accounting(positions: pd.DataFrame) -> pd.DataFrame:
         ordered.loc[ordered["Side"].eq("Long")]
         .groupby("Date")["Contribution"]
         .sum()
-    )
+    ).reindex(daily.index, fill_value=0.0)
     daily["ShortContribution"] = (
         ordered.loc[ordered["Side"].eq("Short")]
         .groupby("Date")["Contribution"]
         .sum()
-    )
+    ).reindex(daily.index, fill_value=0.0)
     daily["TradedNotional"] = traded_notional
     daily["HalfTurnover"] = half_turnover
     # Backward-compatible alias. Economically this is half-turnover, not the

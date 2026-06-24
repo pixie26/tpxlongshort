@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JPX Portfolio Diagnostics 2A</title>
+<style>
+:root{--ink:#17212b;--muted:#637080;--bg:#f4f6f8;--panel:#fff;--line:#dce2e8;--blue:#3268a8;--green:#087f5b;--red:#bd3f3f;--orange:#ca7415;--purple:#7656a8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1440px;margin:auto;padding:28px}.hero{background:#162333;color:#fff;padding:26px 30px;border-radius:14px}.hero h1{margin:0 0 8px;font-size:27px}.hero p{margin:4px 0;color:#d7e0ea}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;margin-top:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;overflow:auto}.full{grid-column:span 12}.half{grid-column:span 6}.third{grid-column:span 4}
+h2,h3{margin:0 0 13px}h2{font-size:19px}h3{font-size:16px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric{padding:14px;border:1px solid var(--line);border-radius:10px}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;font-size:22px;margin-top:5px}.bad{color:var(--red)}.good{color:var(--green)}
+table{border-collapse:collapse;width:100%;font-size:12px}th,td{border-bottom:1px solid var(--line);padding:8px;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600}
+svg{width:100%;height:300px}.axis{stroke:#adb7c1;stroke-width:1}.chart-label{font-size:10px;fill:#687584}.legend{display:flex;gap:18px;color:var(--muted);font-size:12px}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.note{color:var(--muted);font-size:12px}.deferred li{margin:5px 0}@media(max-width:900px){.half,.third{grid-column:span 12}.metrics{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body><main>
+<section class="hero"><h1 id="title"></h1><p id="subtitle"></p><p>统一资本口径：Long-only +100%，Short-only -100%，Long-short +50%/-50%。Short 收益按负权重计算。</p></section>
+<section class="grid">
+ <div class="panel full"><h2>核心诊断</h2><div class="metrics" id="metrics"></div></div>
+ <div class="panel full"><h2>结论</h2><ul id="diagnosis"></ul></div>
+ <div class="panel full"><h2>Long-only / Short-only / Long-short</h2><table id="portfolio"></table></div>
+ <div class="panel half"><h2>5 bps Gross / Net NAV</h2><svg id="nav"></svg><div class="legend"><span><i class="dot" style="background:var(--blue)"></i>Long-only Net</span><span><i class="dot" style="background:var(--red)"></i>Short-only Net</span><span><i class="dot" style="background:var(--green)"></i>Long-short Net</span></div></div>
+ <div class="panel half"><h2>累计分侧贡献与成本</h2><svg id="side"></svg><div class="legend"><span><i class="dot" style="background:var(--blue)"></i>Long gross</span><span><i class="dot" style="background:var(--purple)"></i>Short gross</span><span><i class="dot" style="background:var(--orange)"></i>Total cost</span></div></div>
+ <div class="panel half"><h2>实际成交额与持仓延续率</h2><svg id="turnover"></svg><div class="legend"><span><i class="dot" style="background:var(--orange)"></i>Traded notional</span><span><i class="dot" style="background:var(--blue)"></i>Top retention</span><span><i class="dot" style="background:var(--purple)"></i>Bottom retention</span></div></div>
+ <div class="panel half"><h2>Universe benchmark</h2><svg id="benchmark"></svg><div class="legend"><span><i class="dot" style="background:var(--blue)"></i>Long-only</span><span><i class="dot" style="background:#78828c"></i>Universe</span><span><i class="dot" style="background:var(--green)"></i>Long-short</span></div></div>
+ <div class="panel full"><h2>Fold 归因（5 bps）</h2><table id="fold"></table></div>
+ <div class="panel half"><h2>年度归因（5 bps）</h2><table id="year"></table></div>
+ <div class="panel half"><h2>Universe beta / alpha</h2><table id="beta"></table></div>
+ <div class="panel full"><h2>月度贡献（5 bps）</h2><table id="month"></table></div>
+ <div class="panel full deferred"><h2>2B 暂缓项</h2><ul id="deferred"></ul><p class="note">未使用成交额冒充真实市值，也未在缺少借券数据时推断 shortability。</p></div>
+</section>
+</main>
+<script>
+const DATA=__DIAGNOSTICS_PAYLOAD__;
+const pct=(v,d=2)=>v==null?"—":`${(100*v).toFixed(d)}%`,num=(v,d=2)=>v==null?"—":Number(v).toFixed(d),bps=v=>`${num(v,2)} bps`;
+document.querySelector("#title").textContent=DATA.meta.title;
+document.querySelector("#subtitle").textContent=`${DATA.meta.date_range} ｜ ${DATA.meta.scope} ｜ primary cost ${DATA.meta.primary_cost_bps} bps`;
+const S=DATA.summary.side_summary_primary_cost,T=DATA.summary.turnover,R=DATA.summary.retention,B=DATA.summary.universe_benchmark;
+const metrics=[
+ ["Long gross",pct(S.long_gross),S.long_gross>=0],["Short gross",pct(S.short_gross),S.short_gross>=0],
+ ["Total gross",pct(S.total_gross),S.total_gross>=0],["5 bps total net",pct(S.total_net),S.total_net>=0],
+ ["Long break-even",bps(S.long_break_even_cost_bps),S.long_break_even_cost_bps>=5],["Short break-even",bps(S.short_break_even_cost_bps),S.short_break_even_cost_bps>=5],
+ ["Resize turnover share",pct(T.resize_share),null],["Long-short universe beta",num(B.LongShortBeta),Math.abs(B.LongShortBeta)<.2],
+ ["Top retention",pct(R.top_mean_retention),null],["Bottom retention",pct(R.bottom_mean_retention),null],
+ ["Top avg holding",`${num(R.top_average_holding_days,1)} days`,null],["Bottom avg holding",`${num(R.bottom_average_holding_days,1)} days`,null]
+];
+document.querySelector("#metrics").innerHTML=metrics.map(([k,v,g])=>`<div class="metric"><span>${k}</span><strong class="${g==null?"":g?"good":"bad"}">${v}</strong></div>`).join("");
+const D=DATA.summary.diagnosis;
+document.querySelector("#diagnosis").innerHTML=[
+ `毛收益来源：${D.gross_return_source}`,
+ `空头解释：${D.short_loss_interpretation}`,
+ `换手结构：${pct(DATA.summary.turnover.entry_exit_share)} 来自持仓进出，${pct(DATA.summary.turnover.resize_share)} 来自存量调权。`,
+ `稳定性：${D.fold_side_instability}`,
+ `亏损月与盈利月平均 half-turnover 分别为 ${pct(D.loss_month_average_half_turnover)} / ${pct(D.profit_month_average_half_turnover)}；月度净收益与换手相关性 ${num(D.monthly_net_turnover_correlation)}。`,
+ `重训首日成本${D.retraining_first_day_cost_concentrated?"存在集中":"未形成主要集中"}。`
+].map(x=>`<li>${x}</li>`).join("");
+function table(el,headers,rows){document.querySelector(el).innerHTML=`<thead><tr>${headers.map(x=>`<th>${x[0]}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${headers.map(x=>`<td>${x[2]?x[2](r[x[1]]):r[x[1]]}</td>`).join("")}</tr>`).join("")}</tbody>`}
+const ps=DATA.portfolio_summary;
+table("#portfolio",[["Portfolio","portfolio"],["Cost","cost_bps",bps],["Gross ann.","gross_annualized_return",pct],["Net ann.","net_annualized_return",pct],["Gross Sharpe","gross_sharpe",num],["Net Sharpe","net_sharpe",num],["Net max DD","net_max_drawdown",pct],["Avg traded","average_daily_traded_notional",pct],["Break-even","break_even_cost_bps",bps]],ps);
+table("#fold",[["Fold","Fold"],["Long gross","LongGross",pct],["Short gross","ShortGross",pct],["Long cost","LongCost",pct],["Short cost","ShortCost",pct],["Total net","TotalNet",pct],["Net Sharpe","NetSharpe",num],["Avg half-turnover","AverageHalfTurnover",pct]],DATA.fold);
+table("#year",[["Year","Year"],["Long gross","LongGross",pct],["Short gross","ShortGross",pct],["Total net","TotalNet",pct],["Net Sharpe","NetSharpe",num],["Break-even","TotalBreakEvenCostBps",bps]],DATA.yearly);
+table("#beta",[["Scope","Scope"],["Value","Value"],["Long beta","LongOnlyBeta",num],["Long alpha","LongOnlyAnnualizedAlpha",pct],["LS beta","LongShortBeta",num],["LS alpha","LongShortAnnualizedAlpha",pct]],DATA.betas);
+table("#month",[["Month","Month"],["Long gross","LongGross",pct],["Short gross","ShortGross",pct],["Long cost","LongCost",pct],["Short cost","ShortCost",pct],["Total net","TotalNet",pct],["Turnover","AverageHalfTurnover",pct]],DATA.monthly);
+document.querySelector("#deferred").innerHTML=DATA.summary.deferred_2B.map(x=>`<li>${x}</li>`).join("");
+function cumulative(rows,key){let x=0;return rows.map(r=>(x+=Number(r[key]||0)))}
+function lineChart(sel,series){const svg=document.querySelector(sel),W=900,H=300,p=36,all=series.flatMap(s=>s.values).filter(Number.isFinite),lo=Math.min(...all),hi=Math.max(...all),span=hi-lo||1,n=Math.max(...series.map(s=>s.values.length));const x=i=>p+i*(W-2*p)/Math.max(n-1,1),y=v=>H-p-(v-lo)*(H-2*p)/span;svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.innerHTML=`<line class="axis" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/><line class="axis" x1="${p}" y1="${p}" x2="${p}" y2="${H-p}"/><text class="chart-label" x="4" y="${p}">${num(hi,2)}</text><text class="chart-label" x="4" y="${H-p}">${num(lo,2)}</text>`+series.map(s=>`<polyline fill="none" stroke="${s.color}" stroke-width="2" points="${s.values.map((v,i)=>`${x(i)},${y(v)}`).join(" ")}"/>`).join("")}
+const navRows=DATA.nav,byPort=p=>navRows.filter(r=>r.Portfolio===p).map(r=>r.NetNAV);
+lineChart("#nav",[{values:byPort("Long-only"),color:"#3268a8"},{values:byPort("Short-only"),color:"#bd3f3f"},{values:byPort("Long-short"),color:"#087f5b"}]);
+lineChart("#side",[{values:cumulative(DATA.daily,"LongGross"),color:"#3268a8"},{values:cumulative(DATA.daily,"ShortGross"),color:"#7656a8"},{values:cumulative(DATA.daily,"LongCost").map((v,i)=>v+cumulative(DATA.daily,"ShortCost")[i]),color:"#ca7415"}]);
+lineChart("#turnover",[{values:DATA.daily.map(r=>r.TradedNotional),color:"#ca7415"},{values:DATA.daily.map(r=>r.TopRetention),color:"#3268a8"},{values:DATA.daily.map(r=>r.BottomRetention),color:"#7656a8"}]);
+lineChart("#benchmark",[{values:cumulative(DATA.benchmark,"LongOnlyReturn"),color:"#3268a8"},{values:cumulative(DATA.benchmark,"UniverseReturn"),color:"#78828c"},{values:cumulative(DATA.benchmark,"LongShortReturn"),color:"#087f5b"}]);
+</script>
+</body></html>

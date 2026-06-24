@@ -82,6 +82,18 @@
 - 5 bps 表示每元实际成交额的单程成本，完整买入再卖出的双程成本为 10 bps；
 - 首日前持仓设为 0，收取首日建仓成本。
 
+#### Phase A Findings
+
+| 项目 | 状态 | Findings |
+| --- | --- | --- |
+| A1 50/50 long-short | 已完成 | 组合 gross exposure 为 100%，多头 +50%、空头 -50%，净敞口接近 0。拼接 OOS 毛 Sharpe 为 0.79。 |
+| A2 Turnover | 已完成 | 平均日 half-turnover 为 41.1%，对应平均实际成交额 82.3% NAV，换手较高。旧实现把 half-turnover 当作实际成交额，低估了约一半成本。 |
+| A3 Costs | 已完成 | 5 bps 单程成本下净 Sharpe 为 -1.00；10 bps 为 -2.79；20 bps 为 -6.39。毛收益无法覆盖较低交易成本。 |
+| A4 Long/Short contribution | 已完成 | 多头累计贡献约 +21.6%，空头累计贡献约 -10.7%。毛收益主要来自多头端，空头端没有提供正贡献。 |
+| A5 Monthly/regime diagnostics | 部分完成 | 年度结果均已生成；月度胜率为 50%。月度明细和市场状态划分仍待补全。 |
+
+**Phase A 结论：** 原版信号存在一定毛收益，但高换手、空头端失效和成本敏感性使其目前不具备可交易性。
+
 ### Phase B｜高风险原版设计消融
 
 - **B1**：移除 `SecuritiesCode`；
@@ -91,12 +103,33 @@
 这是进入特征优化前的硬门槛。三项实验可以最快判断高 in-sample Sharpe
 究竟来自证券身份记忆、价格尺度、树模型非线性，还是具有跨股票泛化能力的信号。
 
+#### Phase B Findings
+
+| 项目 | 状态 | Findings |
+| --- | --- | --- |
+| B1 Remove SecuritiesCode | 待执行 | 尚无实验结论。重点观察训练期 Sharpe 是否大幅下降，以及 OOS 表现是否更稳定。 |
+| B2 Remove raw OHLC/Volume levels | 待执行 | 尚无实验结论。用于判断模型是否依赖不可跨股票泛化的价格和成交量尺度。 |
+| B3 Simple linear model | 待执行 | 尚无实验结论。用于区分线性可泛化信号与 LightGBM 的非线性记忆能力。 |
+
+**Phase B 结论：** 尚未开始；完成前不进入大规模特征扩展。
+
 ### Phase C｜改善特征表达
 
 - **C1**：截面 rank normalization；
 - **C2**：行业中性特征或行业中性预测；
 - **C3**：相对价格和标准化成交量特征；
 - **C4**：逐组加入新的特征，并进行单组消融。
+
+#### Phase C Findings
+
+| 项目 | 状态 | Findings |
+| --- | --- | --- |
+| C1 Cross-sectional rank normalization | 待执行 | 尚无实验结论。 |
+| C2 Sector-neutral features/predictions | 待执行 | 尚无实验结论；需要先接入可靠的行业分类并检查时间可用性。 |
+| C3 Relative price/normalized volume | 待执行 | 尚无实验结论。目标是消除绝对价格和成交量尺度依赖。 |
+| C4 New feature groups | 待执行 | 尚无实验结论；每组特征必须单独消融，不一次混合多个改动。 |
+
+**Phase C 结论：** 等待 Phase B 确认原版高 in-sample Sharpe 的来源。
 
 ### Phase D｜训练方法
 
@@ -105,6 +138,17 @@
 - **D3**：multi-seed ensemble；
 - **D4**：fold/model ensemble。
 
+#### Phase D Findings
+
+| 项目 | 状态 | Findings |
+| --- | --- | --- |
+| D1 Early stopping | 待执行 | 尚无实验结论。 |
+| D2 Model comparison | 待执行 | 尚无实验结论；至少应包含线性模型和冻结参数的 LightGBM。 |
+| D3 Multi-seed ensemble | 待执行 | 尚无实验结论；只有单模型存在稳定 OOS 信号时才有意义。 |
+| D4 Fold/model ensemble | 待执行 | 尚无实验结论；需防止使用未来 fold 模型预测过去日期。 |
+
+**Phase D 结论：** 当前不应通过 ensemble 掩盖基础信号不稳定的问题。
+
 ### Phase E｜最终组合
 
 - **E1**：Top-N 敏感度；
@@ -112,6 +156,18 @@
 - **E3**：换手约束；
 - **E4**：行业敞口限制；
 - **E5**：流动性和容量约束。
+
+#### Phase E Findings
+
+| 项目 | 状态 | Findings |
+| --- | --- | --- |
+| E1 Top-N sensitivity | 待执行 | 当前仅使用 Top/Bottom 200，尚无敏感度结论。 |
+| E2 Rank/equal weighting | 待执行 | 当前使用每侧 2→1 线性排名权重，尚未与等权比较。 |
+| E3 Turnover constraints | 待执行 | Phase A 已确认换手是核心问题，但尚未测试缓冲区、持仓保持或换手惩罚。 |
+| E4 Industry exposure limits | 待执行 | 尚无实验结论。 |
+| E5 Liquidity/capacity constraints | 待执行 | 尚未建模成交量参与率、冲击成本、涨跌停、停牌和借券约束。 |
+
+**Phase E 结论：** 当前只有问题诊断，没有组合优化证据。
 
 只有在 Phase B–D 显示样本外信号具有稳定性后，才值得系统优化 Phase E。
 否则组合层优化容易掩盖模型本身缺乏泛化能力的问题。
@@ -159,3 +215,51 @@ Qlib walk-forward 与组合回测的安装、配置和命令见
 - walk-forward 结果优先于单次训练/测试切分；
 - 所有策略结论必须同时考虑交易成本、换手率、时期稳定性和多空两端贡献；
 - 当前结论是：**基线已可复现，但可交易性尚未得到证明。**
+
+## 组合诊断与受控实验结论（2026-06-25）
+
+本阶段保持 LightGBM、特征、训练折和冻结预测不变。2B 所需的 TOPIX、
+真实市值及借券数据暂不引入。
+
+### 2A 诊断
+
+- 50/50 long-short 的 OOS gross Sharpe 为 `0.792`，5 bps net Sharpe 为
+  `-0.995`，break-even cost 仅 `2.22 bps`。
+- Long-only 在 5 bps 下 Sharpe 为 `0.350`；Short-only 为 `-0.887`。
+- 50/50 组合累计 long gross contribution 为 `+21.55%`，short gross
+  contribution 为 `-10.72%`。
+- 交易成本的 `53.7%` 来自空头侧。
+- `91.2%` 的换手来自股票进入和退出持仓名单，而不是存量权重调整。
+- Top 200 / Bottom 200 日延续率分别约为 `63.4%` / `57.1%`，中位持有期均
+  为 1 日。
+- Long-only 对 universe equal-weight 的 beta 约为 `1.20`；long-short beta
+  约为 `0.054`。
+
+### Frozen-prediction 组合实验
+
+参数选择严格按 fold 使用 validation，test 仅用于一次固定评估。Validation
+预测由冻结的每折模型重新生成，没有重新训练模型。
+
+| 规则 | 5 bps Net Sharpe | 平均实际成交额 / NAV | Break-even cost |
+| --- | ---: | ---: | ---: |
+| Baseline 50/50 | -0.995 | 0.823 | 2.22 bps |
+| Long-only Top 200 | 0.350 | 0.761 | 9.55 bps |
+| 75% Long / 25% Short | 0.106 | 0.792 | 5.74 bps |
+| Prediction smoothing 3 days | 0.227 | 0.418 | 6.34 bps |
+| Prediction smoothing 5 days | 0.183 | 0.294 | 6.61 bps |
+| Buffer 150/250 + smoothing 3 days + no-trade band | 0.314 | 0.335 | 7.38 bps |
+| Strict nested-selected | -0.686 | 0.593 | 2.42 bps |
+
+固定 smoothing 和组合规则的 stitched test 结果为正，但不能当作已验证参数。
+严格 nested selection 在多个 fold 上没有稳定迁移。因此当前结论是：
+
+1. Prediction smoothing 是下一轮最值得继续验证的组合层方向。
+2. Buffer 可以降低换手，但单独使用没有稳定提高 break-even cost。
+3. 机械 2 日或 5 日再平衡明显损失 gross alpha。
+4. Long-only 和降低 short gross 改善结果，但引入较大的方向性风险与回撤。
+5. 目前没有足够证据宣布组合优化成功，也不应据此修改模型或扩大参数搜索。
+
+报告：
+
+- `jpx_qlib/outputs/walk_forward/portfolio_diagnostics/portfolio_diagnostics.html`
+- `jpx_qlib/outputs/walk_forward/strategy_experiments/strategy_experiments.html`

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JPX Controlled Portfolio Experiments</title>
+  <style>
+    :root{color-scheme:dark;background:#0b1020;color:#e8eefc;font:14px/1.45 system-ui,sans-serif}
+    body{max-width:1280px;margin:auto;padding:28px}h1{margin-bottom:4px}.muted{color:#9ba9c5}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:22px 0}
+    .card,table{background:#121a2f;border:1px solid #263252;border-radius:10px}.card{padding:14px}
+    .value{font-size:24px;font-weight:700}table{width:100%;border-collapse:collapse;overflow:hidden}
+    th,td{padding:9px 10px;border-bottom:1px solid #263252;text-align:right}th:first-child,td:first-child{text-align:left}
+    canvas{width:100%;height:320px;background:#121a2f;border:1px solid #263252;border-radius:10px}
+    h2{margin-top:28px}
+  </style>
+</head>
+<body>
+  <h1 id="title"></h1><div class="muted" id="subtitle"></div>
+  <div class="cards" id="cards"></div>
+  <h2>Nested fold selections</h2><table id="selections"></table>
+  <h2>Fixed candidate stitched test results</h2><table id="fixed"></table>
+  <h2>Baseline vs nested net NAV</h2><canvas id="chart" width="1200" height="320"></canvas>
+<script>
+const DATA=__STRATEGY_PAYLOAD__;
+const pct=x=>(100*x).toFixed(2)+"%"; const num=x=>Number(x).toFixed(3);
+document.getElementById("title").textContent=DATA.meta.title;
+document.getElementById("subtitle").textContent=DATA.meta.subtitle+" · "+DATA.meta.cost;
+const n=DATA.nested;
+document.getElementById("cards").innerHTML=[
+ ["Nested net Sharpe",num(n.NetSharpe)],["Net annualized return",pct(n.NetAnnualizedReturn)],
+ ["Average traded notional",num(n.AverageTradedNotional)],["Break-even cost",num(n.BreakEvenCostBps)+" bps"],
+ ["Gross Sharpe",num(n.GrossSharpe)],["Max drawdown",pct(n.NetMaxDrawdown)]
+].map(x=>`<div class="card"><div class="muted">${x[0]}</div><div class="value">${x[1]}</div></div>`).join("");
+function table(id,rows,cols){
+ const el=document.getElementById(id); el.innerHTML="<thead><tr>"+cols.map(c=>`<th>${c[1]}</th>`).join("")+"</tr></thead><tbody>"+
+ rows.map(r=>"<tr>"+cols.map(c=>`<td>${c[2]?c[2](r[c[0]]):r[c[0]]}</td>`).join("")+"</tr>").join("")+"</tbody>";
+}
+table("selections",DATA.selections,[["Fold","Fold"],["Candidate","Candidate"],["NetSharpe","Valid net Sharpe",num],
+ ["AverageTradedNotional","Traded notional",num],["BreakEvenCostBps","Break-even bps",num],
+ ["FeasibleCandidateCount","Feasible"],["UsedBaselineFallback","Fallback"]]);
+table("fixed",DATA.fixed,[["Candidate","Candidate"],["Family","Family"],["NetSharpe","Net Sharpe",num],
+ ["GrossSharpe","Gross Sharpe",num],["NetAnnualizedReturn","Net return",pct],
+ ["AverageTradedNotional","Traded notional",num],["BreakEvenCostBps","Break-even bps",num]]);
+const c=document.getElementById("chart"),ctx=c.getContext("2d"),pad=34;
+const series=[["Baseline",DATA.daily.baseline,"#7187ff"],["Nested",DATA.daily.nested,"#47d7ac"]];
+const all=series.flatMap(s=>s[1].map(x=>x.NetNAV)),lo=Math.min(...all),hi=Math.max(...all);
+ctx.strokeStyle="#2a3658";ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,c.height-pad);ctx.lineTo(c.width-pad,c.height-pad);ctx.stroke();
+series.forEach((s,k)=>{ctx.strokeStyle=s[2];ctx.lineWidth=2;ctx.beginPath();s[1].forEach((r,i)=>{
+ const x=pad+i/(s[1].length-1)*(c.width-2*pad),y=c.height-pad-(r.NetNAV-lo)/(hi-lo)*(c.height-2*pad);
+ i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();ctx.fillStyle=s[2];ctx.fillText(s[0],pad+100*k,pad-10)});
+</script>
+</body>
+</html>
