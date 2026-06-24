@@ -1,0 +1,2 @@
+[console_scripts]
+jpx8 = jpx8qlib.cli:main
