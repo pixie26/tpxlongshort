@@ -174,3 +174,24 @@ prediction_parity.json
 ```
 
 届时才能判断差异来自公开旧代码、Qlib 适配，还是原方案本身无法复现。
+
+## Performance note for the public legacy feature code
+
+Do not use `feature_engine: legacy` for the full JPX training file.  The public
+`Features.py` calculates rolling volatility with row-wise `DataFrame.apply` and
+repeated NumPy slicing.  On roughly 2.33 million rows this is prohibitively slow
+and emits chained-assignment warnings under modern pandas.
+
+Use:
+
+```yaml
+data:
+  feature_engine: reimplemented
+```
+
+The vectorized implementation is used for full-data preparation.  Run legacy
+parity separately on a small number of securities with complete histories:
+
+```powershell
+jpx8 --config configs/baseline.yaml feature-parity
+```

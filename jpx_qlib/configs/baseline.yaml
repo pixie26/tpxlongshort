@@ -4,10 +4,20 @@ project:
 
 data:
   stock_prices_csv: D:/projects/jpx/data/raw/jpx/train_files/stock_prices.csv
-  # Use your existing Features.py / Preprocessing.py / Trackers.py / Validation.py folder.
   legacy_code_dir: D:/projects/jpx/JPXTokyoStockExchangePrediction/winner-models/8th
-  feature_engine: legacy       # legacy | reimplemented
+
+  # Full JPX preparation must use the vectorized implementation.  The published
+  # legacy code uses row-wise DataFrame.apply and is impractical on ~2.33M rows.
+  feature_engine: reimplemented       # legacy | reimplemented
   cache_file: prepared_panel.pkl.gz
+
+# Legacy-vs-reimplemented parity runs only on a small number of securities,
+# retaining each selected security's complete history.
+parity:
+  max_instruments: 8
+  prefer_adjustment_events: true
+  # Optional deterministic override:
+  # instrument_codes: [1301, 1332, 1333]
 
 split:
   train_start: '2017-01-04'
@@ -18,7 +28,6 @@ split:
   test_end:    '2021-12-03'
 
 model:
-  # Published notebook used LGBMRegressor defaults. Explicit values make runs reproducible.
   params:
     objective: regression
     n_estimators: 100

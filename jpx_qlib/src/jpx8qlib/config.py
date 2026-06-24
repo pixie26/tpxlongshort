@@ -31,11 +31,21 @@ class Config:
 
     @property
     def feature_engine(self) -> str:
-        return str(self.raw["data"].get("feature_engine", "legacy"))
+        # Full-data preparation should normally use the vectorized implementation.
+        return str(self.raw["data"].get("feature_engine", "reimplemented"))
 
     @property
     def cache_path(self) -> Path:
         return self.output_dir / self.raw["data"].get("cache_file", "prepared_panel.pkl.gz")
+
+    @property
+    def parity_config(self) -> dict[str, Any]:
+        value = self.raw.get("parity", {})
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError("parity config must be a mapping")
+        return value
 
 
 def load_config(path: str | Path) -> Config:

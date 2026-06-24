@@ -29,6 +29,53 @@ def load_raw_stock_prices(path: str | Path) -> pd.DataFrame:
     return df
 
 
+def select_parity_sample(raw: pd.DataFrame, config: Config) -> pd.DataFrame:
+    """Select a small deterministic set of instruments with complete histories.
+
+    The published legacy implementation performs row-wise apply operations and is
+    not suitable for the full 2.3M-row training set.  Feature parity therefore runs
+    on a small number of securities while retaining each selected security's full
+    history, so rolling and adjustment-factor semantics remain testable.
+    """
+    options = config.parity_config
+    explicit_codes = options.get("instrument_codes")
+    max_instruments = int(options.get("max_instruments", 8))
+    prefer_adjustment_events = bool(options.get("prefer_adjustment_events", True))
+
+    available = sorted(pd.to_numeric(raw["SecuritiesCode"], errors="raise").astype(int).unique().tolist())
+    available_set = set(available)
+
+    if explicit_codes:
+        selected = [int(code) for code in explicit_codes]
+        missing = [code for code in selected if code not in available_set]
+        if missing:
+            raise ValueError(f"Parity instrument codes not present in data: {missing}")
+    else:
+        selected: list[int] = []
+        if prefer_adjustment_events and "AdjustmentFactor" in raw.columns:
+            event_mask = raw["AdjustmentFactor"].fillna(1.0).ne(1.0)
+            event_codes = sorted(
+                pd.to_numeric(raw.loc[event_mask, "SecuritiesCode"], errors="coerce")
+                .dropna().astype(int).unique().tolist()
+            )
+            selected.extend(event_codes[:max_instruments])
+
+        for code in available:
+            if code not in selected:
+                selected.append(code)
+            if len(selected) >= max_instruments:
+                break
+
+    if max_instruments > 0:
+        selected = selected[:max_instruments]
+    if not selected:
+        raise ValueError("Parity sample selected no instruments")
+
+    sample = raw[raw["SecuritiesCode"].astype(int).isin(selected)].copy()
+    sample = sample.sort_values(["SecuritiesCode", "Date"], kind="mergesort").reset_index(drop=True)
+    return sample
+
+
 def prepare_panel(config: Config, force: bool = False) -> pd.DataFrame:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     cache = config.cache_path
