@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JPX Stitched OOS 组合回测</title>
+  <style>
+    :root{--ink:#17202a;--muted:#667085;--line:#dce2ea;--soft:#f4f6f9;--panel:#fff;--bg:#f5f7fa;--green:#087f5b;--red:#c2413b;--blue:#3468a8;--orange:#cf7b18;--purple:#7656a8;--shadow:0 1px 2px #1822300d,0 8px 28px #1822300a}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Segoe UI,Arial,"Microsoft YaHei",sans-serif}
+    header{padding:20px 26px;background:#fff;border-bottom:1px solid var(--line)}h1{font-size:22px;margin:0 0 6px}.sub,.note{font-size:12.5px;color:var(--muted);line-height:1.55}
+    main{max-width:1500px;margin:auto;padding:16px;display:grid;gap:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px;box-shadow:var(--shadow)}
+    .warning{border-left:4px solid var(--orange);background:#fff8e8;padding:11px 13px;border-radius:7px;font-size:12.5px;line-height:1.55}
+    .controls{display:flex;gap:14px;align-items:end;flex-wrap:wrap}.controls label{display:grid;gap:5px;color:var(--muted);font-size:12px}.controls select{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:white;min-width:140px}
+    .metrics{display:grid;grid-template-columns:repeat(8,minmax(120px,1fr));gap:8px;margin-top:12px}.metric{padding:10px;border:1px solid #e8ecf1;border-radius:9px;background:#fbfcfd}.metric span{display:block;color:var(--muted);font-size:11.5px;margin-bottom:5px}.metric strong{font-size:17px}.good{color:var(--green)}.bad{color:var(--red)}
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}.chart h3,.panel h3{font-size:14px;margin:0 0 8px}.chart svg{width:100%;height:300px;display:block}.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:11.5px}.swatch{display:inline-block;width:18px;height:3px;margin-right:5px;vertical-align:middle}
+    .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:12px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px 7px;border-bottom:1px solid #edf0f4;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:650}
+    @media(max-width:1050px){.metrics{grid-template-columns:repeat(2,1fr)}.charts,.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header><h1 id="title"></h1><div class="sub" id="subtitle"></div></header>
+<main>
+  <div class="warning" id="warning"></div>
+  <section class="panel">
+    <div class="controls"><label>交易成本<select id="cost"></select></label><div class="note" id="method"></div></div>
+    <div class="metrics" id="metrics"></div>
+  </section>
+  <div class="charts">
+    <section class="panel chart"><h3>累计 NAV</h3><svg id="nav"></svg><div class="legend"><span><i class="swatch" style="background:var(--blue)"></i>Gross NAV</span><span><i class="swatch" style="background:var(--green)"></i>Net NAV</span></div></section>
+    <section class="panel chart"><h3>Net Drawdown</h3><svg id="drawdown"></svg><div class="legend"><span><i class="swatch" style="background:var(--red)"></i>回撤</span></div></section>
+    <section class="panel chart"><h3>多空累计贡献（算术累计）</h3><svg id="contribution"></svg><div class="legend"><span><i class="swatch" style="background:var(--blue)"></i>Long</span><span><i class="swatch" style="background:var(--purple)"></i>Short</span></div></section>
+    <section class="panel chart"><h3>敞口与实际成交额</h3><svg id="exposure"></svg><div class="legend"><span><i class="swatch" style="background:var(--green)"></i>Gross exposure</span><span><i class="swatch" style="background:var(--orange)"></i>Traded notional</span><span><i class="swatch" style="background:var(--red)"></i>Net exposure</span></div></section>
+  </div>
+  <div class="grid">
+    <section class="panel"><h3>成本敏感度</h3><div class="table-wrap"><table id="costTable"></table></div></section>
+    <section class="panel"><h3>年度表现（主成本情景）</h3><div class="table-wrap"><table id="yearTable"></table></div></section>
+  </div>
+  <section class="panel"><h3>口径与限制</h3><div class="note" id="notes"></div></section>
+</main>
+<script>
+const DATA=__PORTFOLIO_PAYLOAD__;
+const cost=document.querySelector("#cost"),pct=(x,d=2)=>Number.isFinite(x)?(100*x).toFixed(d)+"%":"n/a",num=(x,d=2)=>Number.isFinite(x)?x.toFixed(d):"n/a";
+for(const s of DATA.summary)cost.add(new Option(`${s.cost_bps} bps`,String(s.cost_bps)));cost.value=String(DATA.meta.primary_cost_bps);
+document.querySelector("#title").textContent=DATA.meta.title;
+document.querySelector("#subtitle").textContent=`${DATA.meta.date_range} ｜ ${DATA.meta.portfolio}`;
+document.querySelector("#warning").textContent=DATA.meta.warning;
+document.querySelector("#method").textContent=DATA.meta.weighting;
+document.querySelector("#notes").innerHTML=`收益标签：预测日 t 对应 t+1 至 t+2 的 JPX Target。<br>${DATA.meta.cost}<br>${DATA.meta.warning}`;
+function selectedSummary(){return DATA.summary.find(x=>String(x.cost_bps)===cost.value)}
+function selectedDaily(){return DATA.daily.filter(x=>String(x.CostBps)===cost.value)}
+function renderMetrics(){const s=selectedSummary(),fields=[["Gross 总收益",pct(s.gross_total_return)],["Net 总收益",pct(s.net_total_return)],["Net 年化收益",pct(s.net_annualized_return)],["Net 年化波动",pct(s.net_annualized_volatility)],["Net Sharpe",num(s.net_sharpe)],["最大回撤",pct(s.net_max_drawdown)],["日均换手",pct(s.average_daily_turnover)],["Gross / Net 敞口",`${pct(s.average_gross_exposure,1)} / ${pct(s.average_net_exposure,1)}`]];document.querySelector("#metrics").innerHTML=fields.map(([k,v],i)=>`<div class="metric"><span>${k}</span><strong class="${i===1||i===2||i===4?(s.net_total_return>=0?"good":"bad"):""}">${v}</strong></div>`).join("")}
+function lineChart(id,rows,series,format=v=>num(v,2)){const svg=document.querySelector(id),W=720,H=300,p={l:58,r:18,t:12,b:30},iw=W-p.l-p.r,ih=H-p.t-p.b,all=rows.flatMap(r=>series.map(s=>r[s.key])).filter(Number.isFinite);let lo=Math.min(...all),hi=Math.max(...all);if(lo===hi){lo-=1;hi+=1}const pad=(hi-lo)*.06;lo-=pad;hi+=pad;const x=i=>p.l+(rows.length===1?0:i/(rows.length-1)*iw),y=v=>p.t+(hi-v)/(hi-lo)*ih,path=key=>rows.map((r,i)=>(i?"L":"M")+x(i).toFixed(1)+","+y(r[key]).toFixed(1)).join(" ");let out="";for(let i=0;i<5;i++){const v=hi-(hi-lo)*i/4,yy=p.t+ih*i/4;out+=`<line x1="${p.l}" x2="${W-p.r}" y1="${yy}" y2="${yy}" stroke="#edf0f4"/><text x="${p.l-7}" y="${yy+4}" text-anchor="end" font-size="10.5" fill="#667085">${format(v)}</text>`}for(const s of series)out+=`<path d="${path(s.key)}" fill="none" stroke="${s.color}" stroke-width="${s.width||2}"/>`;out+=`<text x="${p.l}" y="${H-6}" font-size="10.5" fill="#667085">${rows[0].Date}</text><text x="${W-p.r}" y="${H-6}" text-anchor="end" font-size="10.5" fill="#667085">${rows.at(-1).Date}</text>`;svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.innerHTML=out}
+function renderCharts(){const r=selectedDaily();lineChart("#nav",r,[{key:"GrossNAV",color:"#3468a8"},{key:"NetNAV",color:"#087f5b"}]);lineChart("#drawdown",r,[{key:"NetDrawdown",color:"#c2413b"}],v=>pct(v,1));lineChart("#contribution",r,[{key:"CumulativeLongContribution",color:"#3468a8"},{key:"CumulativeShortContribution",color:"#7656a8"}],v=>pct(v,1));lineChart("#exposure",r,[{key:"GrossExposure",color:"#087f5b"},{key:"TradedNotional",color:"#cf7b18"},{key:"NetExposure",color:"#c2413b"}],v=>pct(v,0))}
+function renderTables(){document.querySelector("#costTable").innerHTML="<thead><tr><th>成本</th><th>Gross 收益</th><th>Net 收益</th><th>年化收益</th><th>波动</th><th>Sharpe</th><th>最大回撤</th><th>成本拖累</th></tr></thead><tbody>"+DATA.summary.map(s=>`<tr><td>${s.cost_bps} bps</td><td>${pct(s.gross_total_return)}</td><td class="${s.net_total_return>=0?"good":"bad"}">${pct(s.net_total_return)}</td><td>${pct(s.net_annualized_return)}</td><td>${pct(s.net_annualized_volatility)}</td><td>${num(s.net_sharpe)}</td><td>${pct(s.net_max_drawdown)}</td><td>${pct(s.annualized_cost_drag)}</td></tr>`).join("")+"</tbody>";document.querySelector("#yearTable").innerHTML="<thead><tr><th>年份</th><th>Gross</th><th>Net</th><th>Sharpe</th><th>最大回撤</th><th>Half-turnover</th><th>成交额</th></tr></thead><tbody>"+DATA.yearly.map(s=>`<tr><td>${s.year}</td><td>${pct(s.gross_return)}</td><td class="${s.net_return>=0?"good":"bad"}">${pct(s.net_return)}</td><td>${num(s.net_sharpe)}</td><td>${pct(s.net_max_drawdown)}</td><td>${pct(s.average_half_turnover)}</td><td>${pct(s.average_traded_notional)}</td></tr>`).join("")+"</tbody>"}
+function render(){renderMetrics();renderCharts()}cost.onchange=render;renderTables();render();
+</script>
+</body>
+</html>

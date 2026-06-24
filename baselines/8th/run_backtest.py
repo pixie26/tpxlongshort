@@ -19,7 +19,7 @@ import run_baseline as baseline
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-DEFAULT_COST_BPS = (0.0, 15.0)
+DEFAULT_COST_BPS = (0.0, 5.0, 10.0, 20.0)
 PORTFOLIO_SIZE = 200
 TRADING_DAYS = 252
 
@@ -191,8 +191,8 @@ def daily_from_positions(positions: pd.DataFrame) -> pd.DataFrame:
         previous, on=["Date", "SecuritiesCode"], how="outer"
     ).fillna({"Weight": 0.0, "PreviousWeight": 0.0})
     changes["AbsChange"] = (changes["Weight"] - changes["PreviousWeight"]).abs()
-    turnover = 0.5 * changes.groupby("Date", sort=True)["AbsChange"].sum()
-    turnover.iloc[0] = 0.0  # Unknown pre-period holdings; do not charge artificial entry costs.
+    traded_notional = changes.groupby("Date", sort=True)["AbsChange"].sum()
+    half_turnover = 0.5 * traded_notional
 
     grouped = ordered.groupby("Date", sort=True)
     daily = grouped.agg(
@@ -205,7 +205,13 @@ def daily_from_positions(positions: pd.DataFrame) -> pd.DataFrame:
     short_return = ordered.loc[ordered["Side"].eq("Short")].groupby("Date")["Contribution"].sum()
     daily["LongReturn"] = daily["Date"].map(long_return)
     daily["ShortReturn"] = daily["Date"].map(short_return)
-    daily["Turnover"] = daily["Date"].map(turnover)
+    daily["TradedNotional"] = daily["Date"].map(traded_notional)
+    daily["HalfTurnover"] = daily["Date"].map(half_turnover)
+    daily["Turnover"] = daily["HalfTurnover"]
+    if not np.allclose(daily["GrossReturn"], daily["LongReturn"] + daily["ShortReturn"]):
+        raise AssertionError("Gross return does not equal long plus short return")
+    if not np.allclose(daily["TradedNotional"], 2.0 * daily["HalfTurnover"]):
+        raise AssertionError("Traded notional does not equal two times half-turnover")
     return daily
 
 
@@ -220,8 +226,10 @@ def summarize_returns(daily: pd.DataFrame, period: str, model: str, cost_bps: fl
     result["Period"] = period
     result["Model"] = model
     result["CostBps"] = float(cost_bps)
-    result["TradingCost"] = result["Turnover"] * cost_bps / 10_000.0
+    result["TradingCost"] = result["TradedNotional"] * cost_bps / 10_000.0
     result["NetReturn"] = result["GrossReturn"] - result["TradingCost"]
+    if not np.allclose(result["GrossReturn"], result["NetReturn"] + result["TradingCost"]):
+        raise AssertionError("Gross return does not equal net return plus trading cost")
     maximum_drawdown, equity, drawdown = max_drawdown(result["NetReturn"])
     result["Equity"] = equity
     result["Drawdown"] = drawdown
@@ -248,7 +256,11 @@ def summarize_returns(daily: pd.DataFrame, period: str, model: str, cost_bps: fl
         "sharpe": sharpe,
         "max_drawdown": maximum_drawdown,
         "hit_rate": float((result["NetReturn"] > 0).mean()),
-        "average_daily_turnover": float(result["Turnover"].iloc[1:].mean()),
+        "average_daily_turnover": float(result["HalfTurnover"].mean()),
+        "average_daily_half_turnover": float(result["HalfTurnover"].mean()),
+        "average_daily_traded_notional": float(result["TradedNotional"].mean()),
+        "average_rebalance_half_turnover": float(result["HalfTurnover"].iloc[1:].mean()),
+        "average_rebalance_traded_notional": float(result["TradedNotional"].iloc[1:].mean()),
         "annualized_cost_drag": float(result["TradingCost"].mean() * TRADING_DAYS),
         "average_gross_exposure": float(result["GrossExposure"].mean()),
         "average_net_exposure": float(result["NetExposure"].mean()),
@@ -345,12 +357,18 @@ def main() -> int:
                 **row,
                 "Date": pd.Timestamp(row["Date"]).date().isoformat(),
             }
-            for row in daily_frame[["Date", "Period", "Model", "CostBps", "NetReturn", "Equity", "Drawdown", "Turnover"]].to_dict("records")
+            for row in daily_frame[[
+                "Date", "Period", "Model", "CostBps", "NetReturn", "Equity",
+                "Drawdown", "HalfTurnover", "TradedNotional", "Turnover",
+            ]].to_dict("records")
         ],
         "meta": {
             "generated_at": pd.Timestamp.now(tz="Asia/Hong_Kong").isoformat(),
             "portfolio": "Top 200 long / bottom 200 short; competition linear weights; 50% gross per side",
-            "cost": "Cost = one-way turnover × bps; first date turnover and cost set to zero",
+            "cost": (
+                "bps is a one-way cost per dollar traded; cost = sum(abs(delta weight)) × bps. "
+                "Pre-period holdings are zero, so first-day entry cost is charged."
+            ),
             "warning": "Training is in-sample because both supplied models were fit using the full training interval. Supplemental is an out-of-sample proxy, not a production execution test.",
         },
     }
@@ -365,8 +383,20 @@ def main() -> int:
         "cost_bps": sorted(set(args.cost_bps)),
         "portfolio_size_per_side": PORTFOLIO_SIZE,
         "annualization_days": TRADING_DAYS,
-        "turnover_definition": "0.5 * sum(abs(weight_t - weight_t_minus_1)); first date set to zero",
-        "cost_definition": "turnover * cost_bps / 10000",
+        "return_definition": (
+            "JPX Target on prediction date t is the adjusted close return from t+1 to t+2"
+        ),
+        "position_timing": (
+            "weights selected on prediction date t are established at t+1 close "
+            "and held until t+2 close"
+        ),
+        "half_turnover_definition": "0.5 * sum(abs(weight_t - weight_t_minus_1))",
+        "traded_notional_definition": "sum(abs(weight_t - weight_t_minus_1))",
+        "cost_definition": "traded_notional * one_way_cost_bps_per_dollar / 10000",
+        "cost_bps_interpretation": (
+            "one-way cost per dollar traded; a buy then sell round trip costs twice the bps"
+        ),
+        "first_day_entry_cost_charged": True,
         "period_interpretation": {
             "Training (in-sample)": "Full-period fitted-model backcast; descriptive only",
             "Supplemental (OOS proxy)": "Held-out competition supplemental interval; proxy only",

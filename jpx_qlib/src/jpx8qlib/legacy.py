@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+import warnings
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -59,7 +60,20 @@ def build_legacy_features(raw: pd.DataFrame, code_dir: str | Path) -> pd.DataFra
             Features.SMA("Return", 30),
         ]
         tracker = Trackers.StateTracker(features)
-        prepared = tracker.prepare_data_for_training(raw.copy())
+        with warnings.catch_warnings():
+            # The immutable published code intentionally computes sample
+            # volatility on one observation and uses chained assignment for
+            # rolling warm-up rows. Suppress only those known compatibility
+            # warnings so parity runs remain readable on current libraries.
+            warnings.filterwarnings("ignore", message="Degrees of freedom <= 0 for slice")
+            warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
+            warnings.filterwarnings("ignore", message="DataFrame.fillna with 'method' is deprecated")
+            warnings.filterwarnings("ignore", message="ChainedAssignmentError")
+            warnings.filterwarnings(
+                "ignore",
+                category=pd.errors.SettingWithCopyWarning,
+            )
+            prepared = tracker.prepare_data_for_training(raw.copy())
 
     names = [feature.name for feature in features]
     if names != DERIVED_FEATURE_COLUMNS:

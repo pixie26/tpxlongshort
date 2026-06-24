@@ -2,30 +2,50 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from pathlib import Path
+from time import perf_counter
 
 import pandas as pd
 
 from .config import Config
 from .constants import FEATURE_COLUMNS, LABEL_COLUMN
-from .features import build_reimplemented_features
+from .features import build_legacy_optimized_features
 from .legacy import build_legacy_features
+
+logger = logging.getLogger(__name__)
 
 
 def file_sha256(path: str | Path, chunk_size: int = 1 << 20) -> str:
+    started = perf_counter()
+    logger.info("Hashing source file: %s", path)
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
         for chunk in iter(lambda: handle.read(chunk_size), b""):
             digest.update(chunk)
-    return digest.hexdigest()
+    result = digest.hexdigest()
+    logger.info("Source hash complete in %.1fs", perf_counter() - started)
+    return result
 
 
 def load_raw_stock_prices(path: str | Path) -> pd.DataFrame:
     source = Path(path)
     if not source.exists():
         raise FileNotFoundError(f"JPX stock prices file not found: {source}")
+    started = perf_counter()
+    logger.info(
+        "Reading stock prices CSV: %s (%.1f MiB)",
+        source,
+        source.stat().st_size / (1024 * 1024),
+    )
     df = pd.read_csv(source)
     df["Date"] = pd.to_datetime(df["Date"], errors="raise")
+    logger.info(
+        "CSV loaded: %s rows, %d columns in %.1fs",
+        f"{len(df):,}",
+        len(df.columns),
+        perf_counter() - started,
+    )
     return df
 
 
@@ -77,34 +97,67 @@ def select_parity_sample(raw: pd.DataFrame, config: Config) -> pd.DataFrame:
 
 
 def prepare_panel(config: Config, force: bool = False) -> pd.DataFrame:
+    total_started = perf_counter()
     config.output_dir.mkdir(parents=True, exist_ok=True)
     cache = config.cache_path
     if cache.exists() and not force:
-        return pd.read_pickle(cache)
+        started = perf_counter()
+        logger.info("Loading prepared panel cache: %s", cache)
+        panel = pd.read_pickle(cache)
+        logger.info("Cache loaded: %s rows in %.1fs", f"{len(panel):,}", perf_counter() - started)
+        return panel
 
+    logger.info(
+        "Preparing full panel with feature_engine=%s force=%s",
+        config.feature_engine,
+        force,
+    )
     raw = load_raw_stock_prices(config.stock_prices_csv)
+    started = perf_counter()
     if config.feature_engine == "legacy":
+        logger.info("Building features with published legacy implementation")
         prepared = build_legacy_features(raw, config.legacy_code_dir)
-    elif config.feature_engine == "reimplemented":
-        prepared = build_reimplemented_features(raw)
+    elif config.feature_engine == "legacy_optimized":
+        logger.info("Building features with parity-validated legacy_optimized engine")
+        prepared = build_legacy_optimized_features(raw)
     else:
-        raise ValueError("feature_engine must be 'legacy' or 'reimplemented'")
+        raise ValueError(
+            "feature_engine must be 'legacy' or 'legacy_optimized' "
+            "('reimplemented' remains a compatibility alias)"
+        )
+    logger.info(
+        "Feature panel built: %s rows in %.1fs",
+        f"{len(prepared):,}",
+        perf_counter() - started,
+    )
 
+    started = perf_counter()
+    logger.info("Validating and sorting prepared panel")
     prepared["Date"] = pd.to_datetime(prepared["Date"], errors="raise")
     prepared = prepared.sort_values(["Date", "SecuritiesCode"], kind="mergesort").reset_index(drop=True)
 
     missing = [c for c in FEATURE_COLUMNS + [LABEL_COLUMN] if c not in prepared.columns]
     if missing:
         raise ValueError(f"Prepared panel is missing columns: {missing}")
+    logger.info("Panel validation complete in %.1fs", perf_counter() - started)
 
+    started = perf_counter()
+    logger.info("Writing compressed cache: %s", cache)
     prepared.to_pickle(cache, compression="gzip")
+    logger.info(
+        "Cache written: %.1f MiB in %.1fs",
+        cache.stat().st_size / (1024 * 1024),
+        perf_counter() - started,
+    )
+    date_count = int(prepared["Date"].nunique())
+    instrument_count = int(prepared["SecuritiesCode"].nunique())
     manifest = {
         "source": str(config.stock_prices_csv),
         "source_sha256": file_sha256(config.stock_prices_csv),
         "feature_engine": config.feature_engine,
         "rows": int(len(prepared)),
-        "dates": int(prepared["Date"].nunique()),
-        "instruments": int(prepared["SecuritiesCode"].nunique()),
+        "dates": date_count,
+        "instruments": instrument_count,
         "first_date": str(prepared["Date"].min().date()),
         "last_date": str(prepared["Date"].max().date()),
         "feature_columns": FEATURE_COLUMNS,
@@ -112,6 +165,13 @@ def prepare_panel(config: Config, force: bool = False) -> pd.DataFrame:
     }
     (config.output_dir / "data_manifest.json").write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
+    )
+    logger.info(
+        "Preparation complete: %s rows, %s dates, %s instruments in %.1fs",
+        f"{len(prepared):,}",
+        f"{date_count:,}",
+        f"{instrument_count:,}",
+        perf_counter() - total_started,
     )
     return prepared
 

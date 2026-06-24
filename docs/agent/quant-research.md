@@ -40,6 +40,16 @@ or model-comparison work.
 
 - The competition score represents a stylized daily long-short ranking, not a production-ready
   trading result.
+- Interpret `Target(t)` as the adjusted close return from `t+1` close to `t+2` close. A portfolio
+  formed from the prediction at `t` is therefore established at `t+1` close and held to `t+2`
+  close; do not attribute the return to a position entered at `t` close.
+- Report both actual traded notional `sum(abs(weight_t - weight_t_minus_1))` and conventional
+  half-turnover `0.5 * sum(abs(weight_t - weight_t_minus_1))`.
+- Interpret a stated cost such as 5 bps as a one-way cost per dollar actually traded unless an
+  experiment explicitly says otherwise. Apply it to actual traded notional, charge initial
+  entry from zero holdings, and note that a complete buy/sell round trip costs 10 bps.
+- Preserve daily accounting identities: gross return equals long plus short contribution,
+  traded notional equals twice half-turnover, and gross return equals net return plus costs.
 - Do not claim tradable alpha without testing costs, liquidity, turnover, borrowability,
   execution timing, capacity, and regime stability.
 - Prefer simple features and models unless added complexity produces repeatable out-of-sample

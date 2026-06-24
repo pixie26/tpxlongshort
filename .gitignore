@@ -9,6 +9,39 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
+# Rebuildable research intermediates
+*.pkl.gz
+*.parquet
+*.joblib
+*.npy
+*.npz
+*.feather
+
+# Generated qlib run data; keep source, configs, and HTML reports
+/jpx_qlib/outputs/**/*.csv
+/jpx_qlib/outputs/**/*.json
+/jpx_qlib/outputs/**/*.log
+
 # Rebuildable large backtest outputs
 /artifacts/backtest_8th/cache/
 /artifacts/backtest_8th/portfolio_positions.parquet
+
+# Generated Qlib data and prediction artifacts
+jpx_qlib/outputs/**/*.pkl
+jpx_qlib/outputs/**/*.pkl.gz
+
+# Python temporary files
+.pytest_cache/
+**/.pytest_cache/
+
+
+# Large generated JPX/Qlib artifacts
+jpx_qlib/outputs/jpx8_published_baseline/prepared_panel.pkl.gz
+jpx_qlib/outputs/walk_forward/native_stitched_oos_predictions.pkl.gz
+jpx_qlib/outputs/walk_forward/qlib_stitched_oos_predictions.pkl.gz
+jpx_qlib/outputs/walk_forward/stitched_oos_predictions.pkl.gz
+
+
+# General generated pickle artifacts
+jpx_qlib/outputs/**/*.pkl
+jpx_qlib/outputs/**/*.pkl.gz

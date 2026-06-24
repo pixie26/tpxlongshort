@@ -1,0 +1,69 @@
+project:
+  name: jpx8_walk_forward
+  output_dir: outputs/walk_forward
+
+data:
+  stock_prices_csv: D:/projects/jpx/data/raw/jpx/train_files/stock_prices.csv
+  legacy_code_dir: D:/projects/jpx/JPXTokyoStockExchangePrediction/winner-models/8th
+  feature_engine: legacy_optimized
+  # Reuse the parity-validated panel instead of duplicating the 231 MiB cache.
+  cache_file: ../jpx8_published_baseline/prepared_panel.pkl.gz
+
+model:
+  params:
+    objective: regression
+    n_estimators: 100
+    learning_rate: 0.1
+    num_leaves: 31
+    max_depth: -1
+    min_child_samples: 20
+    subsample: 1.0
+    colsample_bytree: 1.0
+    reg_alpha: 0.0
+    reg_lambda: 0.0
+    random_state: 42
+    n_jobs: -1
+    verbosity: -1
+
+ranking:
+  mode: corrected_rank
+  top_n: 200
+  weight_first: 2.0
+  weight_last: 1.0
+
+evaluation:
+  annualization_days: 252
+
+portfolio:
+  # Consume the frozen Native stitched OOS artifact. Qlib predictions have exact parity.
+  predictions_file: native_stitched_oos_predictions.pkl.gz
+  output_subdir: portfolio_backtest
+  top_n: 200
+  long_gross: 0.5
+  short_gross: 0.5
+  cost_bps: [0, 5, 10, 20]
+  primary_cost_bps: 5
+
+walk_forward:
+  purge_days: 2
+  folds:
+    - name: fold_01
+      train: ['2017-01-04', '2018-12-31']
+      valid: ['2019-01-01', '2019-06-30']
+      test:  ['2019-07-01', '2019-12-31']
+    - name: fold_02
+      train: ['2017-01-04', '2019-06-30']
+      valid: ['2019-07-01', '2019-12-31']
+      test:  ['2020-01-01', '2020-06-30']
+    - name: fold_03
+      train: ['2017-01-04', '2019-12-31']
+      valid: ['2020-01-01', '2020-06-30']
+      test:  ['2020-07-01', '2020-12-31']
+    - name: fold_04
+      train: ['2017-01-04', '2020-06-30']
+      valid: ['2020-07-01', '2020-12-31']
+      test:  ['2021-01-01', '2021-06-30']
+    - name: fold_05
+      train: ['2017-01-04', '2020-12-31']
+      valid: ['2021-01-01', '2021-06-30']
+      test:  ['2021-07-01', '2021-12-03']

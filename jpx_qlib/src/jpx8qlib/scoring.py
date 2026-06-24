@@ -31,8 +31,11 @@ def daily_spread_return(
         if n == 0:
             continue
         weights = linear_weights(n, weight_first, weight_last)
-        top = np.average(group.head(n)["Target"].to_numpy(float), weights=weights)
-        bottom = np.average(group.tail(n)["Target"].to_numpy(float), weights=weights[::-1])
+        # JPX competition metric: the linear weights are normalized to mean 1,
+        # then returns are summed.  This is intentionally not a weighted
+        # average; dividing by weights.sum() would shrink each daily spread by n.
+        top = float(np.dot(group.head(n)["Target"].to_numpy(float), weights))
+        bottom = float(np.dot(group.tail(n)["Target"].to_numpy(float), weights[::-1]))
         values[pd.Timestamp(date)] = float(top - bottom)
     return pd.Series(values, name="daily_spread").sort_index()
 

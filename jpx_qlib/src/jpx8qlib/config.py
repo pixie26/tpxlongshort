@@ -31,8 +31,12 @@ class Config:
 
     @property
     def feature_engine(self) -> str:
-        # Full-data preparation should normally use the vectorized implementation.
-        return str(self.raw["data"].get("feature_engine", "reimplemented"))
+        # "reimplemented" was the original migration name. Keep accepting it,
+        # but expose the parity-validated engine under its precise canonical name.
+        value = str(self.raw["data"].get("feature_engine", "legacy_optimized"))
+        if value == "reimplemented":
+            return "legacy_optimized"
+        return value
 
     @property
     def cache_path(self) -> Path:

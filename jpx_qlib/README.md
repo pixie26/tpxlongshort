@@ -111,6 +111,17 @@ outputs/jpx8_published_baseline/feature_parity.json
 jpx8 --config configs/baseline.yaml native
 ```
 
+首次确认 Native 结果后，用以下命令冻结 reference：
+
+```powershell
+jpx8 --config configs/baseline.yaml native --freeze-reference
+```
+
+冻结文件保存在 `outputs/jpx8_published_baseline/native_reference/`。该命令同时保存
+明确标记为 `chronological_oos` 的 `native_metrics.json`，以及仅用于诊断、不得用于
+策略评估的 `native_in_sample_metrics.json`。已有冻结目录默认不会被覆盖；确需替换时
+显式增加 `--force-reference`。
+
 主要输出：
 
 ```text
@@ -129,7 +140,36 @@ native_metrics.json
 jpx8 --config configs/baseline.yaml qlib
 ```
 
+确认 Native reference 已存在后，冻结 Qlib parity baseline：
+
+```powershell
+jpx8 --config configs/baseline.yaml qlib --freeze-reference
+```
+
+该命令重新生成 Qlib 结果及 Native/Qlib prediction parity，并把模型、预测、排名、
+评分、配置和实际安装包清单保存到
+`outputs/jpx8_published_baseline/qlib_reference/`。已有快照默认拒绝覆盖。
+
+## Expanding walk-forward
+
+使用五折 expanding window，并在 Train/Valid 尾部各 purge 两个实际交易日：
+
+```powershell
+jpx8 --config configs/walk_forward.yaml native-walk-forward
+jpx8 --config configs/walk_forward.yaml qlib-walk-forward
+jpx8 --config configs/walk_forward.yaml portfolio-backtest
+```
+
+必须先运行 Native，再运行 Qlib。结果保存在 `outputs/walk_forward/`；每折包含模型、
+预测、排名、daily spread、metrics 和 Native/Qlib prediction parity。根目录包含
+2019 H2 至 2021 H2 的 stitched OOS 预测、年度诊断和合并汇总。
+
 Qlib 使用相同的 prepared panel、相同 segments、相同 LightGBM 参数和相同 scorer。
+
+`portfolio-backtest` 不会重训模型。它读取冻结的 Native stitched OOS predictions，
+构造每日 Top 200 多头 / Bottom 200 空头组合，排名线性权重分别归一化到 +50% / -50%，
+并在 `outputs/walk_forward/portfolio_backtest/` 输出自包含 HTML 图表、持仓、每日会计、
+0/5/10/20 bps 成本敏感度和复现元数据。
 
 ## 5. 验证 Qlib 没有改变预测
 
@@ -186,11 +226,13 @@ Use:
 
 ```yaml
 data:
-  feature_engine: reimplemented
+  feature_engine: legacy_optimized
 ```
 
-The vectorized implementation is used for full-data preparation.  Run legacy
-parity separately on a small number of securities with complete histories:
+The parity-validated vectorized implementation is used for full-data
+preparation. The former name `reimplemented` remains accepted as a compatibility
+alias. Run legacy parity separately on a small number of securities with
+complete histories:
 
 ```powershell
 jpx8 --config configs/baseline.yaml feature-parity

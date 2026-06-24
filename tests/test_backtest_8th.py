@@ -42,20 +42,39 @@ def test_portfolio_has_expected_exposure_and_competition_weight_shape():
     assert abs(day.loc[day["Rank"].eq(399), "Weight"].item()) > abs(day.loc[day["Rank"].eq(200), "Weight"].item())
 
 
-def test_turnover_and_cost_are_applied_once_to_one_way_turnover():
+def test_turnover_and_cost_use_actual_traded_notional_and_charge_entry():
     predictions = sample_predictions()
     second_date = predictions["Date"].max()
     second_day = predictions["Date"].eq(second_date)
     predictions.loc[second_day, "Rank_reference"] = 399 - predictions.loc[second_day, "Rank_reference"]
     positions = runner.construct_positions(predictions, "test", "reference")
     daily = runner.daily_from_positions(positions)
-    assert daily.iloc[0]["Turnover"] == 0.0
-    assert np.isclose(daily.iloc[1]["Turnover"], 1.0)
+    assert np.isclose(daily.iloc[0]["HalfTurnover"], 0.5)
+    assert np.isclose(daily.iloc[0]["TradedNotional"], 1.0)
+    assert np.isclose(daily.iloc[1]["HalfTurnover"], 1.0)
+    assert np.isclose(daily.iloc[1]["TradedNotional"], 2.0)
+    assert np.allclose(daily["TradedNotional"], 2.0 * daily["HalfTurnover"])
     gross, summary0 = runner.summarize_returns(daily, "test", "reference", 0)
     net, summary15 = runner.summarize_returns(daily, "test", "reference", 15)
     assert np.allclose(gross["NetReturn"], gross["GrossReturn"])
-    assert np.allclose(net["NetReturn"], net["GrossReturn"] - net["Turnover"] * 0.0015)
+    assert np.allclose(
+        net["NetReturn"],
+        net["GrossReturn"] - net["TradedNotional"] * 0.0015,
+    )
+    assert np.isclose(net.iloc[0]["TradingCost"], 0.0015)
+    assert np.isclose(net.iloc[1]["TradingCost"], 0.0030)
+    assert np.allclose(net["GrossReturn"], net["NetReturn"] + net["TradingCost"])
     assert summary15["ending_equity"] <= summary0["ending_equity"]
+
+
+def test_target_timing_contract_matches_official_jpx_definition():
+    spec = ROOT / "data" / "raw" / "jpx" / "data_specifications" / "stock_price_spec.csv"
+    target = pd.read_csv(spec).set_index("Column").loc["Target", "Remarks"]
+    assert "between t+2 and t+1 where t+0 is TradeDate" in target
+
+    closes = pd.Series([100.0, 110.0, 121.0])
+    target_at_t = closes.shift(-2) / closes.shift(-1) - 1.0
+    assert np.isclose(target_at_t.iloc[0], 0.10)
 
 
 def test_rank_validation_rejects_duplicates():

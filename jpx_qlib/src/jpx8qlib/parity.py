@@ -10,10 +10,20 @@ from .constants import FEATURE_COLUMNS
 
 
 def compare_frames(left: pd.DataFrame, right: pd.DataFrame, columns: list[str] | None = None) -> dict:
-    columns = columns or FEATURE_COLUMNS
+    columns = list(columns or FEATURE_COLUMNS)
     key = ["Date", "SecuritiesCode"]
-    a = left[key + columns].sort_values(key).reset_index(drop=True)
-    b = right[key + columns].sort_values(key).reset_index(drop=True)
+    value_columns = [column for column in columns if column not in key]
+    selected_columns = key + value_columns
+    missing_left = [column for column in selected_columns if column not in left.columns]
+    missing_right = [column for column in selected_columns if column not in right.columns]
+    if missing_left or missing_right:
+        raise ValueError(
+            "Cannot compare frames with missing columns: "
+            f"left={missing_left}, right={missing_right}"
+        )
+
+    a = left[selected_columns].sort_values(key, kind="mergesort").reset_index(drop=True)
+    b = right[selected_columns].sort_values(key, kind="mergesort").reset_index(drop=True)
     result = {
         "left_rows": len(a),
         "right_rows": len(b),
@@ -25,11 +35,12 @@ def compare_frames(left: pd.DataFrame, right: pd.DataFrame, columns: list[str] |
         return result
 
     all_close = True
-    for col in columns:
+    for col in value_columns:
         av = pd.to_numeric(a[col], errors="coerce").to_numpy(float)
         bv = pd.to_numeric(b[col], errors="coerce").to_numpy(float)
         close = np.isclose(av, bv, rtol=1e-8, atol=1e-10, equal_nan=True)
-        max_abs = float(np.nanmax(np.abs(av - bv))) if len(av) else 0.0
+        finite = np.isfinite(av) & np.isfinite(bv)
+        max_abs = float(np.max(np.abs(av[finite] - bv[finite]))) if finite.any() else 0.0
         info = {"matching_fraction": float(close.mean()), "max_abs_difference": max_abs}
         result["columns"][col] = info
         all_close &= bool(close.all())
