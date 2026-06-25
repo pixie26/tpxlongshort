@@ -1,0 +1,11 @@
+extends: ../ablations/a2a_no_code_no_ohlc.yaml
+project: {name: d1_early_stopping, output_dir: outputs/training_research/d1_early_stopping}
+model:
+  params:
+    n_estimators: 1000
+    early_stopping_rounds: 50
+    eval_metric: rmse
+ablation:
+  id: D1
+  label: A2a LightGBM validation early stopping
+  portfolio_cost_bps: 5

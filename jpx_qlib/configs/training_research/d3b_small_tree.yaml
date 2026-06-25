@@ -1,0 +1,5 @@
+extends: ../ablations/a2a_no_code_no_ohlc.yaml
+project: {name: d3b_small_tree, output_dir: outputs/training_research/d3b_small_tree}
+model:
+  params: {num_leaves: 15, max_depth: 5}
+ablation: {id: D3b, label: A2a num_leaves 15 max_depth 5, portfolio_cost_bps: 5}

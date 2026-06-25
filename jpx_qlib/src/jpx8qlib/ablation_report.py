@@ -37,6 +37,14 @@ def _fold_metrics(config: Config) -> pd.DataFrame:
         row = json.loads(path.read_text(encoding="utf-8"))
         rows.append({
             "Fold": fold,
+            "BestIteration": int(
+                row.get(
+                    "best_iteration",
+                    config.raw.get("model", {})
+                    .get("params", {})
+                    .get("n_estimators", 1),
+                )
+            ),
             "InSampleCompetitionSharpe": float(row["in_sample_sharpe"]),
             "ValidationCompetitionSharpe": float(row["valid_sharpe"]),
             "OOSCompetitionSharpe": float(row["oos_sharpe"]),
@@ -127,6 +135,7 @@ def run_ablation_report(config: Config) -> dict[str, Any]:
             "MedianFoldTradedNotional": float(
                 portfolio_folds["AverageTradedNotional"].median()
             ),
+            "MedianBestIteration": float(model_metrics["BestIteration"].median()),
             "PositiveGrossFolds": int((portfolio_folds["GrossSharpe"] > 0).sum()),
             "PositiveNetFolds": int((portfolio_folds["NetSharpe"] > 0).sum()),
             "MeanRankIC": float(model_metrics["RankIC"].mean()),

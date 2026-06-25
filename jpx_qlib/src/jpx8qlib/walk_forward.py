@@ -213,6 +213,7 @@ def _segment_metrics(
     config: Config,
     fold: WalkForwardFold,
     role: str,
+    best_iteration: int,
 ) -> tuple[pd.DataFrame, pd.Series, dict]:
     _, _, train_metrics = _evaluate(train, config)
     _, _, valid_metrics = _evaluate(valid, config)
@@ -222,6 +223,7 @@ def _segment_metrics(
         "run_role": role,
         "evaluation_scope": "expanding_walk_forward",
         "scoring_schema_version": 2,
+        "best_iteration": int(best_iteration),
         "train_rows": int(len(train)),
         "valid_rows": int(len(valid)),
         "test_rows": int(len(test)),
@@ -240,7 +242,7 @@ def _segment_metrics(
 
 def _metrics_equal(left: dict, right: dict, atol: float = 1e-12) -> bool:
     keys = (
-        "train_rows", "valid_rows", "test_rows", "in_sample_sharpe",
+        "best_iteration", "train_rows", "valid_rows", "test_rows", "in_sample_sharpe",
         "valid_sharpe", "oos_sharpe", "oos_competition_sharpe",
         "rank_ic", "rank_ic_median", "top_bottom_spread", "oos_days",
         "oos_cumulative_spread",
@@ -403,7 +405,7 @@ def _write_combined_summary(output_dir: Path, native: dict, qlib: dict) -> dict:
         }
         for prefix, metrics in (("native", native_fold), ("qlib", qlib_fold)):
             for key in (
-                "train_rows", "valid_rows", "test_rows", "in_sample_sharpe",
+                "best_iteration", "train_rows", "valid_rows", "test_rows", "in_sample_sharpe",
                 "valid_sharpe", "oos_sharpe", "rank_ic", "top_bottom_spread",
                 "oos_cumulative_spread",
             ):
@@ -517,6 +519,47 @@ def finalize_existing_walk_forward(config: Config) -> dict:
     return _write_combined_summary(output_dir, native, qlib)
 
 
+def finalize_completed_fold_artifacts(config: Config) -> dict:
+    """Rebuild parity and summaries when every Native/Qlib fold artifact exists."""
+    panel = prepare_experiment_panel(config)
+    folds = build_walk_forward_folds(panel, config)
+    tolerance = float(
+        config.parity_config.get(
+            "prediction_tolerance",
+            1e-10 if config.model_type == "ridge" else 0.0,
+        )
+    )
+    for fold in folds:
+        fold_dir = config.output_dir / fold.name
+        native = pd.read_pickle(fold_dir / "native_predictions.pkl.gz")
+        qlib = pd.read_pickle(fold_dir / "qlib_predictions.pkl.gz")
+        native_metrics = json.loads(
+            (fold_dir / "native_metrics.json").read_text(encoding="utf-8")
+        )
+        qlib_metrics = json.loads(
+            (fold_dir / "qlib_metrics.json").read_text(encoding="utf-8")
+        )
+        parity = _fold_parity(
+            native,
+            qlib,
+            native_metrics,
+            qlib_metrics,
+            ranking_mode=config.raw["ranking"]["mode"],
+            prediction_tolerance=tolerance,
+        )
+        write_report(parity, fold_dir / "prediction_parity.json")
+        if not (
+            parity["keys_identical"]
+            and parity["daily_rank_identical"]
+            and parity["metrics_identical"]
+            and parity["prediction_within_tolerance"]
+        ):
+            raise AssertionError(f"{fold.name} parity failed: {parity}")
+    native_summary = _write_summary(config, config.output_dir, folds, "native")
+    qlib_summary = _write_summary(config, config.output_dir, folds, "qlib")
+    return _write_combined_summary(config.output_dir, native_summary, qlib_summary)
+
+
 def run_walk_forward(config: Config, mode: str, force_prepare: bool = False) -> dict:
     if mode not in {"native", "qlib"}:
         raise ValueError("mode must be 'native' or 'qlib'")
@@ -583,6 +626,7 @@ def run_walk_forward(config: Config, mode: str, force_prepare: bool = False) -> 
             config,
             fold,
             role=f"{mode}_walk_forward_fold",
+            best_iteration=model.best_iteration,
         )
         test_pred.to_pickle(fold_dir / f"{mode}_predictions.pkl.gz", compression="gzip")
         valid_pred.to_pickle(

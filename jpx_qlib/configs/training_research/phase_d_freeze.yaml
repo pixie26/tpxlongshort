@@ -1,0 +1,7 @@
+phase_d_freeze:
+  primary_model_baseline: A2a LightGBM
+  primary_portfolio_layer: smooth_3d
+  diagnostic_model: A3 Ridge
+  rejected_feature_variants: [C3a, C3b, C4a, C4b, C4c]
+  rejected_transform: mechanical_static_sector_neutralization
+  fold_6_policy: no_parameter_selection

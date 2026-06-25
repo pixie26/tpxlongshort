@@ -31,6 +31,15 @@ class Config:
         return Path(self.raw["data"]["stock_prices_csv"])
 
     @property
+    def stock_prices_csvs(self) -> list[Path]:
+        values = self.raw["data"].get("stock_prices_csvs")
+        if values is None:
+            return [self.stock_prices_csv]
+        if not isinstance(values, list) or not values:
+            raise ValueError("data.stock_prices_csvs must be a non-empty list")
+        return [Path(str(value)) for value in values]
+
+    @property
     def legacy_code_dir(self) -> Path:
         return Path(self.raw["data"].get("legacy_code_dir", ""))
 
@@ -121,4 +130,21 @@ def load_config(path: str | Path) -> Config:
         raw = yaml.safe_load(handle)
     if not isinstance(raw, dict):
         raise ValueError(f"Config must contain a mapping: {source}")
+    parent_value = raw.pop("extends", None)
+    if parent_value is not None:
+        parent_path = Path(str(parent_value))
+        if not parent_path.is_absolute():
+            parent_path = (source.parent / parent_path).resolve()
+        parent = load_config(parent_path).raw
+        raw = _deep_merge(parent, raw)
     return Config(raw=raw, source_path=source)
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    result = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result

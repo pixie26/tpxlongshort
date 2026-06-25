@@ -33,6 +33,8 @@ jpx_qlib/outputs/ablations/**/ablation_config.yaml
 jpx_qlib/outputs/ablations/**/walk_forward.yaml
 jpx_qlib/outputs/feature_research/**/ablation_config.yaml
 jpx_qlib/outputs/feature_research/**/walk_forward.yaml
+jpx_qlib/outputs/training_research/**/ablation_config.yaml
+jpx_qlib/outputs/training_research/**/walk_forward.yaml
 
 # Python temporary files
 .pytest_cache/

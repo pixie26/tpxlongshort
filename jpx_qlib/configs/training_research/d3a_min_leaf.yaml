@@ -1,0 +1,5 @@
+extends: ../ablations/a2a_no_code_no_ohlc.yaml
+project: {name: d3a_min_leaf, output_dir: outputs/training_research/d3a_min_leaf}
+model:
+  params: {min_child_samples: 100}
+ablation: {id: D3a, label: A2a min_child_samples 100, portfolio_cost_bps: 5}

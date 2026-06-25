@@ -1,0 +1,4 @@
+extends: ../ablations/a2a_no_code_no_ohlc.yaml
+project: {name: d2_seed_42, output_dir: outputs/ablations/a2a_no_code_no_ohlc}
+model: {params: {random_state: 42}}
+ablation: {id: D2s42, label: A2a seed 42, portfolio_cost_bps: 5}

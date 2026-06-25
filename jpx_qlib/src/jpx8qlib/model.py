@@ -19,12 +19,17 @@ class PublishedLGBM:
     categorical_features: list[str] | None = None
 
     def __post_init__(self) -> None:
+        params = dict(self.params)
+        self.early_stopping_rounds = int(
+            params.pop("early_stopping_rounds", 0)
+        )
+        self.eval_metric = str(params.pop("eval_metric", "rmse"))
         self.feature_columns = list(self.feature_columns or FEATURE_COLUMNS)
         configured = self.categorical_features or ["SecuritiesCode", "SupervisionFlag"]
         self.categorical_features = [
             column for column in configured if column in self.feature_columns
         ]
-        self.estimator = lgb.LGBMRegressor(**self.params)
+        self.estimator = lgb.LGBMRegressor(**params)
         self._fitted = False
 
     def _prepare_x(self, frame: pd.DataFrame) -> pd.DataFrame:
@@ -42,15 +47,36 @@ class PublishedLGBM:
         }
         if valid is not None:
             fit_kwargs["eval_set"] = [(self._prepare_x(valid), valid[LABEL_COLUMN].astype(float))]
-            fit_kwargs["eval_metric"] = "rmse"
+            fit_kwargs["eval_metric"] = self.eval_metric
+            if self.early_stopping_rounds > 0:
+                fit_kwargs["callbacks"].append(
+                    lgb.early_stopping(
+                        self.early_stopping_rounds,
+                        first_metric_only=True,
+                        verbose=False,
+                    )
+                )
         self.estimator.fit(x_train, y_train, **fit_kwargs)
         self._fitted = True
         return self
 
+    @property
+    def best_iteration(self) -> int:
+        value = getattr(self.estimator, "best_iteration_", None)
+        if value is None or int(value) <= 0:
+            return int(self.estimator.n_estimators)
+        return int(value)
+
     def predict(self, frame: pd.DataFrame) -> pd.Series:
         if not self._fitted:
             raise RuntimeError("Model is not fitted")
-        values = np.asarray(self.estimator.predict(self._prepare_x(frame)), dtype=float)
+        values = np.asarray(
+            self.estimator.predict(
+                self._prepare_x(frame),
+                num_iteration=self.best_iteration,
+            ),
+            dtype=float,
+        )
         return pd.Series(values, index=frame.index, name="Prediction")
 
 
@@ -96,6 +122,10 @@ class RidgeModel:
             raise RuntimeError("Model is not fitted")
         values = np.asarray(self.estimator.predict(self._prepare_x(frame)), dtype=float)
         return pd.Series(values, index=frame.index, name="Prediction")
+
+    @property
+    def best_iteration(self) -> int:
+        return 1
 
 
 def make_model(

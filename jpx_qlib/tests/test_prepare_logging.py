@@ -5,7 +5,31 @@ import numpy as np
 import pandas as pd
 
 from jpx8qlib.config import Config
-from jpx8qlib.data import prepare_panel
+from jpx8qlib.data import load_raw_stock_prices, prepare_panel
+
+
+def test_load_raw_stock_prices_combines_sources_in_security_date_order(tmp_path):
+    first = tmp_path / "first.csv"
+    second = tmp_path / "second.csv"
+    pd.DataFrame({
+        "Date": ["2021-01-04", "2021-01-05"],
+        "SecuritiesCode": [2, 1],
+    }).to_csv(first, index=False)
+    pd.DataFrame({
+        "Date": ["2021-01-06", "2021-01-05"],
+        "SecuritiesCode": [1, 2],
+    }).to_csv(second, index=False)
+
+    combined = load_raw_stock_prices([first, second])
+
+    assert list(
+        combined[["SecuritiesCode", "Date"]].itertuples(index=False, name=None)
+    ) == [
+        (1, pd.Timestamp("2021-01-05")),
+        (1, pd.Timestamp("2021-01-06")),
+        (2, pd.Timestamp("2021-01-04")),
+        (2, pd.Timestamp("2021-01-05")),
+    ]
 
 
 def test_prepare_panel_reports_progress(caplog, tmp_path):

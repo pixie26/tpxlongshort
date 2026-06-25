@@ -91,3 +91,7 @@ class QlibPublishedModel:
         prediction.index = data.index
         prediction.name = "score"
         return prediction
+
+    @property
+    def best_iteration(self) -> int:
+        return int(self.model.best_iteration)

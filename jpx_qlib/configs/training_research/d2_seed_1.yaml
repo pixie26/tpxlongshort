@@ -1,0 +1,5 @@
+extends: ../ablations/a2a_no_code_no_ohlc.yaml
+project: {name: d2_seed_1, output_dir: outputs/training_research/d2_seed_1}
+model: {params: {random_state: 1}}
+parity: {prediction_tolerance: 1.0e-15}
+ablation: {id: D2s1, label: A2a seed 1, portfolio_cost_bps: 5}

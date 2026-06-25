@@ -136,21 +136,25 @@ factor 研究基线。
 
 ### Phase D｜训练方法
 
-- **D1**：使用验证集 early stopping；
-- **D2**：比较线性模型、LightGBM 和其他受控候选模型；
-- **D3**：multi-seed ensemble；
-- **D4**：fold/model ensemble。
+- **D1**：验证集 early stopping；
+- **D2**：multi-seed 稳定性与简单 prediction ensemble；
+- **D3**：有限、单因素 LightGBM 正则化；
+- **D4**：冻结唯一 challenger；
+- **D5**：在 Supplemental 上运行独立 Fold 6。
 
 #### Phase D Findings
 
 | 项目 | 状态 | Findings |
 | --- | --- | --- |
-| D1 Early stopping | 待执行 | 尚无实验结论。 |
-| D2 Model comparison | 待执行 | 尚无实验结论；至少应包含线性模型和冻结参数的 LightGBM。 |
-| D3 Multi-seed ensemble | 待执行 | 尚无实验结论；只有单模型存在稳定 OOS 信号时才有意义。 |
-| D4 Fold/model ensemble | 待执行 | 尚无实验结论；需防止使用未来 fold 模型预测过去日期。 |
+| D1 Early stopping | 已完成 | 验证 RMSE 选出的 best iteration 为 1/21/4/7/19；smooth3 median net Sharpe 降至 -0.76。gap 缩小主要来自欠拟合，不是泛化改善。 |
+| D2 Multi-seed stability | 已完成 | 五个 seed 的 rank correlation 约 0.83–0.95；smooth3 median net Sharpe 为 0.20–0.55。五 seed ensemble 仅 0.28、3/5 正 folds，未改善 reference。 |
+| D3 Limited regularization | 已完成 | 增大叶节点样本、缩小树、增加 L2 均未通过 paired gates；最佳 D3c 也仅改善 2/5 folds，并恶化 worst fold。 |
+| D4 Freeze challenger | 已完成 | 没有训练 variant 同时满足多数 folds、median、worst fold、break-even 和 gap 门槛，因此不冻结 challenger。 |
+| D5 Fold 6 | 已完成 | Supplemental 2021-12-06 至 2022-06-24 上，A2a smooth3 Gross/Net Sharpe 为 -0.95/-1.53，Ridge 为 -0.40/-0.64；两者 Rank IC 和 break-even 均为负。 |
 
-**Phase D 结论：** 当前不应通过 ensemble 掩盖基础信号不稳定的问题。
+**Phase D 结论：** A2a 在原五折中的弱正结果没有通过独立 Fold 6。
+Early stopping、seed ensemble 和有限正则化均未产生合格 challenger；当前应把
+Phase C/D 的正结果视为样本依赖诊断，而不是可交易模型证据。
 
 ### Phase E｜最终组合
 
@@ -360,3 +364,39 @@ accounting 均一致；C4c 最大预测差低于 `1e-15`。
 - `jpx_qlib/outputs/feature_research/report_c3/ablation_report.html`
 - `jpx_qlib/outputs/feature_research/report_c4/ablation_report.html`
 - `jpx_qlib/outputs/feature_research/c2_sector_diagnostics/sector_diagnostics.html`
+
+## Phase D 训练稳定性与独立 Fold 6（2026-06-26）
+
+本轮冻结 A2a 特征、100-tree LightGBM 和 smooth3 组合。D1 的 early stopping
+只允许验证集选择树数；D2 只改变 seed；D3 每次只改变一类正则化参数。
+
+| Variant | Smooth3 median fold net Sharpe | Positive folds | Worst fold | Median break-even | Median train/OOS gap |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| D0 / A2a | 0.551 | 4/5 | -1.040 | 7.68 bps | 12.92 |
+| D1 Early stopping | -0.764 | 1/5 | -2.537 | 0.58 bps | 2.98 |
+| D3a min_child_samples=100 | 0.347 | 3/5 | -1.577 | 6.58 bps | 13.43 |
+| D3b num_leaves=15, max_depth=5 | 0.252 | 3/5 | -1.570 | 6.24 bps | 8.03 |
+| D3c lambda_l2=10 | 0.735 | 3/5 | -1.306 | 8.17 bps | 13.02 |
+| Five-seed mean prediction | 0.284 | 3/5 | -1.250 | 6.44 bps | N/A |
+
+D1 虽将 gap 降至 2.98，但 best iteration 中位数仅 7，且成本后表现转负。
+D3c 的 median 较高，但仅改善 2/5 folds，positive-fold coverage、worst fold 和
+gap 均未通过门槛。五 seed prediction ensemble 同样弱于 D0，因此 D4 没有
+challenger。
+
+Fold 6 使用 train + supplemental 连续面板，训练截至 2021-06-28，验证截至
+2021-12-01，测试为 2021-12-06 至 2022-06-24；边界 purge 2 个交易日，且没有
+在 Fold 6 内选择参数。
+
+| Arm | Portfolio | Gross Sharpe | 5 bps Net Sharpe | Rank IC | Break-even |
+| --- | --- | ---: | ---: | ---: | ---: |
+| F6-A0 A2a LightGBM | smooth3 | -0.951 | -1.526 | -0.0150 | -8.33 bps |
+| F6-Ridge diagnostic | smooth3 | -0.400 | -0.640 | -0.0304 | -8.35 bps |
+
+Fold 6 否定了 A2a 和 Ridge 在原五折上的正面诊断。所有 Phase D 与 Fold 6
+variant 均分别通过 Native/Qlib prediction、rank 和 metrics parity。
+
+报告：
+
+- `jpx_qlib/outputs/training_research/report/ablation_report.html`
+- `jpx_qlib/outputs/training_research/seed_report/seed_stability.html`

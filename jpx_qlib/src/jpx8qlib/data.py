@@ -28,18 +28,36 @@ def file_sha256(path: str | Path, chunk_size: int = 1 << 20) -> str:
     return result
 
 
-def load_raw_stock_prices(path: str | Path) -> pd.DataFrame:
-    source = Path(path)
-    if not source.exists():
-        raise FileNotFoundError(f"JPX stock prices file not found: {source}")
-    started = perf_counter()
-    logger.info(
-        "Reading stock prices CSV: %s (%.1f MiB)",
-        source,
-        source.stat().st_size / (1024 * 1024),
+def load_raw_stock_prices(
+    path: str | Path | list[str | Path],
+) -> pd.DataFrame:
+    sources = (
+        [Path(value) for value in path]
+        if isinstance(path, list)
+        else [Path(path)]
     )
-    df = pd.read_csv(source)
+    missing = [source for source in sources if not source.exists()]
+    if missing:
+        raise FileNotFoundError(f"JPX stock prices file not found: {missing}")
+    started = perf_counter()
+    frames = []
+    for source in sources:
+        logger.info(
+            "Reading stock prices CSV: %s (%.1f MiB)",
+            source,
+            source.stat().st_size / (1024 * 1024),
+        )
+        frames.append(pd.read_csv(source))
+    df = pd.concat(frames, ignore_index=True)
     df["Date"] = pd.to_datetime(df["Date"], errors="raise")
+    duplicate = df.duplicated(["Date", "SecuritiesCode"], keep=False)
+    if duplicate.any():
+        raise ValueError(
+            "Stock price sources contain duplicate Date/SecuritiesCode rows"
+        )
+    df = df.sort_values(
+        ["SecuritiesCode", "Date"], kind="mergesort"
+    ).reset_index(drop=True)
     logger.info(
         "CSV loaded: %s rows, %d columns in %.1fs",
         f"{len(df):,}",
@@ -112,7 +130,7 @@ def prepare_panel(config: Config, force: bool = False) -> pd.DataFrame:
         config.feature_engine,
         force,
     )
-    raw = load_raw_stock_prices(config.stock_prices_csv)
+    raw = load_raw_stock_prices(config.stock_prices_csvs)
     started = perf_counter()
     if config.feature_engine == "legacy":
         logger.info("Building features with published legacy implementation")
@@ -143,6 +161,7 @@ def prepare_panel(config: Config, force: bool = False) -> pd.DataFrame:
 
     started = perf_counter()
     logger.info("Writing compressed cache: %s", cache)
+    cache.parent.mkdir(parents=True, exist_ok=True)
     prepared.to_pickle(cache, compression="gzip")
     logger.info(
         "Cache written: %.1f MiB in %.1fs",
@@ -151,9 +170,14 @@ def prepare_panel(config: Config, force: bool = False) -> pd.DataFrame:
     )
     date_count = int(prepared["Date"].nunique())
     instrument_count = int(prepared["SecuritiesCode"].nunique())
+    source_records = [
+        {"path": str(source), "sha256": file_sha256(source)}
+        for source in config.stock_prices_csvs
+    ]
     manifest = {
-        "source": str(config.stock_prices_csv),
-        "source_sha256": file_sha256(config.stock_prices_csv),
+        "source": source_records[0]["path"],
+        "source_sha256": source_records[0]["sha256"],
+        "sources": source_records,
         "feature_engine": config.feature_engine,
         "rows": int(len(prepared)),
         "dates": date_count,

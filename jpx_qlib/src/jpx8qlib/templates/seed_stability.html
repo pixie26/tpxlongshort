@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JPX LightGBM Seed Stability</title>
+  <style>
+    :root{color-scheme:dark;background:#09101e;color:#e8eefb;font:14px/1.45 system-ui,sans-serif}
+    body{max-width:1500px;margin:auto;padding:28px}.muted{color:#9aa8c2}
+    table{width:100%;border-collapse:collapse;background:#111a2d;border:1px solid #263452}
+    th,td{padding:8px 9px;border-bottom:1px solid #263452;text-align:right;white-space:nowrap}
+    th:first-child,td:first-child{text-align:left}.section{margin-top:28px;overflow:auto}
+  </style>
+</head>
+<body>
+  <h1>JPX LightGBM Seed Stability</h1>
+  <p class="muted" id="note"></p>
+  <div class="section"><h2>Native / Qlib parity</h2><table id="parity"></table></div>
+  <div class="section"><h2>Single-seed summary</h2><table id="single"></table></div>
+  <div class="section"><h2>Ensemble summary</h2><table id="summary"></table></div>
+  <div class="section"><h2>Pairwise correlations</h2><table id="correlations"></table></div>
+<script>
+const DATA=__SEED_PAYLOAD__, n=x=>Number(x).toFixed(6);
+document.getElementById("note").textContent=DATA.stochasticity_note;
+function draw(id,rows,cols){document.getElementById(id).innerHTML="<thead><tr>"+
+ cols.map(c=>`<th>${c[1]}</th>`).join("")+"</tr></thead><tbody>"+
+ rows.map(r=>"<tr>"+cols.map(c=>`<td>${c[2]?c[2](r[c[0]]):r[c[0]]}</td>`).join("")+"</tr>").join("")+"</tbody>"}
+draw("parity",DATA.parity,[["Variant","Variant"],["ParityPassed","Passed"],
+ ["KeysIdentical","Keys"],["RanksIdentical","Ranks"],["MetricsIdentical","Metrics"],
+ ["MaxPredictionDifference","Max prediction diff",x=>Number(x).toExponential(2)]]);
+draw("single",DATA.single_seed_summary,[["Variant","Variant"],["Portfolio","Portfolio"],
+ ["MedianFoldNetSharpe","Median net",n],["PositiveNetFolds","Positive folds"],
+ ["WorstFoldNetSharpe","Worst net",n],["MedianBreakEvenCostBps","Break-even",n],
+ ["MedianTradedNotional","Traded",n],["MedianRankIC","Median rank IC",n],
+ ["MedianTrainOOSGap","Median train/OOS gap",n]]);
+draw("summary",DATA.ensemble_summary,[["Portfolio","Portfolio"],
+ ["MedianFoldGrossSharpe","Median gross",n],["MedianFoldNetSharpe","Median net",n],
+ ["PositiveNetFolds","Positive folds"],["WorstFoldNetSharpe","Worst net",n],
+ ["MedianBreakEvenCostBps","Break-even",n],["MedianTradedNotional","Traded",n]]);
+draw("correlations",DATA.correlations,[["Fold","Fold"],["Left","Left"],["Right","Right"],
+ ["PredictionCorrelation","Prediction corr",n],["RankCorrelation","Rank corr",n],
+ ["MaxAbsDifference","Max diff",x=>Number(x).toExponential(2)]]);
+</script>
+</body>
+</html>

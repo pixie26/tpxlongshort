@@ -1,0 +1,20 @@
+extends: ../ablations/a2a_no_code_no_ohlc.yaml
+project:
+  name: fold6_a2a
+  output_dir: outputs/training_research/fold6_a2a
+data:
+  stock_prices_csvs:
+    - D:/projects/jpx/data/raw/jpx/train_files/stock_prices.csv
+    - D:/projects/jpx/data/raw/jpx/supplemental_files/stock_prices.csv
+  cache_file: ../fold6_shared/prepared_panel.pkl.gz
+ablation:
+  id: F6-A0
+  label: Frozen A2a LightGBM on Fold 6
+  portfolio_cost_bps: 5
+walk_forward:
+  purge_days: 2
+  folds:
+    - name: fold_06
+      train: ['2017-01-04', '2021-06-30']
+      valid: ['2021-07-01', '2021-12-03']
+      test: ['2021-12-06', '2022-06-24']

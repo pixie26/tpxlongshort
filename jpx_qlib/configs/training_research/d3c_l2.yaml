@@ -1,0 +1,5 @@
+extends: ../ablations/a2a_no_code_no_ohlc.yaml
+project: {name: d3c_l2, output_dir: outputs/training_research/d3c_l2}
+model:
+  params: {reg_lambda: 10.0}
+ablation: {id: D3c, label: A2a lambda_l2 10, portfolio_cost_bps: 5}

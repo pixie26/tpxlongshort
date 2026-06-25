@@ -343,3 +343,39 @@ Reports:
 - `outputs/feature_research/report_c3/ablation_report.html`
 - `outputs/feature_research/report_c4/ablation_report.html`
 - `outputs/feature_research/c2_sector_diagnostics/sector_diagnostics.html`
+
+## Phase D training stability and Fold 6
+
+Configs are under `configs/training_research/`. A2a, fixed 100 trees, and
+smooth3 are the frozen reference. Early stopping uses validation RMSE only;
+test data never selects `best_iteration`.
+
+```powershell
+jpx8 --config configs/training_research/d1_early_stopping.yaml native-walk-forward
+jpx8 --config configs/training_research/d1_early_stopping.yaml qlib-walk-forward
+jpx8 --config configs/training_research/suite_seeds.yaml seed-suite-report
+```
+
+Early stopping selected 1/21/4/7/19 trees and reduced smooth3 median net Sharpe
+to `-0.764`. None of the three fixed regularization variants passed the paired
+stability gates. Five seeds produced materially different ranks
+(pairwise rank correlation about `0.83` to `0.95`), while their mean-prediction
+ensemble achieved only `0.284` median net Sharpe with 3/5 positive folds.
+No Phase D challenger was frozen.
+
+Fold 6 joins the immutable train and supplemental stock-price files before
+feature construction so rolling state remains continuous. Parameters are
+fixed before evaluating 2021-12-06 through 2022-06-24.
+
+| Arm | Smooth3 gross Sharpe | Smooth3 5 bps net Sharpe | Rank IC |
+| --- | ---: | ---: | ---: |
+| Frozen A2a LightGBM | -0.951 | -1.526 | -0.0150 |
+| Frozen Ridge diagnostic | -0.400 | -0.640 | -0.0304 |
+
+Every Phase D and Fold 6 variant has its own Native/Qlib prediction, rank, and
+metric parity result.
+
+Reports:
+
+- `outputs/training_research/report/ablation_report.html`
+- `outputs/training_research/seed_report/seed_stability.html`

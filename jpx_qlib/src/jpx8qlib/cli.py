@@ -17,8 +17,9 @@ from .parity import compare_frames, compare_predictions, write_report
 from .portfolio import run_portfolio_backtest
 from .sector_diagnostics import run_sector_diagnostics
 from .strategy_experiments import run_strategy_experiments
+from .training_report import run_seed_suite_report
 from .workflow import run_native, run_qlib
-from .walk_forward import run_walk_forward
+from .walk_forward import finalize_completed_fold_artifacts, run_walk_forward
 
 
 def _configure_logging(output_dir, level_name: str) -> logging.Logger:
@@ -93,6 +94,10 @@ def _parser() -> argparse.ArgumentParser:
         help="Run the same expanding walk-forward through Qlib and verify parity",
     )
     p.add_argument("--force-prepare", action="store_true")
+    sub.add_parser(
+        "finalize-walk-forward",
+        help="Rebuild parity and summaries from completed Native/Qlib fold artifacts",
+    )
 
     sub.add_parser(
         "portfolio-backtest",
@@ -117,6 +122,10 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "sector-diagnostics",
         help="Compare raw and static-sector-neutral prediction transforms",
+    )
+    sub.add_parser(
+        "seed-suite-report",
+        help="Report LightGBM seed stability and the fixed mean-prediction ensemble",
     )
 
     sub.add_parser(
@@ -176,6 +185,12 @@ def main() -> None:
             indent=2,
             allow_nan=True,
         ))
+    elif args.command == "finalize-walk-forward":
+        print(json.dumps(
+            finalize_completed_fold_artifacts(cfg),
+            indent=2,
+            allow_nan=True,
+        ))
     elif args.command == "portfolio-backtest":
         print(json.dumps(
             run_portfolio_backtest(cfg),
@@ -209,6 +224,12 @@ def main() -> None:
     elif args.command == "sector-diagnostics":
         print(json.dumps(
             run_sector_diagnostics(cfg),
+            indent=2,
+            allow_nan=False,
+        ))
+    elif args.command == "seed-suite-report":
+        print(json.dumps(
+            run_seed_suite_report(cfg),
             indent=2,
             allow_nan=False,
         ))
