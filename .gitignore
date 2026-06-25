@@ -29,6 +29,8 @@ __pycache__/
 # Generated Qlib data and prediction artifacts
 jpx_qlib/outputs/**/*.pkl
 jpx_qlib/outputs/**/*.pkl.gz
+jpx_qlib/outputs/ablations/**/ablation_config.yaml
+jpx_qlib/outputs/ablations/**/walk_forward.yaml
 
 # Python temporary files
 .pytest_cache/

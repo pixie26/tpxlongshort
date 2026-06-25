@@ -176,9 +176,38 @@ def prepare_panel(config: Config, force: bool = False) -> pd.DataFrame:
     return prepared
 
 
-def to_qlib_frame(panel: pd.DataFrame) -> pd.DataFrame:
+def prepare_experiment_panel(config: Config, force: bool = False) -> pd.DataFrame:
+    panel = prepare_panel(config, force=force)
+    return apply_experiment_features(panel, config)
+
+
+def apply_experiment_features(panel: pd.DataFrame, config: Config) -> pd.DataFrame:
+    missing = [column for column in config.feature_columns if column not in panel.columns]
+    if missing:
+        raise ValueError(f"Experiment feature columns missing from panel: {missing}")
+    if config.feature_transform == "none":
+        return panel
+
+    transformed = panel.copy()
+    rank_columns = [
+        column
+        for column in config.feature_columns
+        if column not in set(config.categorical_features)
+    ]
+    if rank_columns:
+        transformed[rank_columns] = transformed.groupby(
+            "Date", sort=False
+        )[rank_columns].rank(method="average", pct=True)
+    return transformed
+
+
+def to_qlib_frame(
+    panel: pd.DataFrame,
+    feature_columns: list[str] | None = None,
+) -> pd.DataFrame:
     """Convert a prepared flat panel to Qlib's MultiIndex row/column contract."""
-    required = set(FEATURE_COLUMNS + [LABEL_COLUMN, "Date", "SecuritiesCode"])
+    columns = list(feature_columns or FEATURE_COLUMNS)
+    required = set(columns + [LABEL_COLUMN, "Date", "SecuritiesCode"])
     missing = sorted(required - set(panel.columns))
     if missing:
         raise ValueError(f"Cannot create Qlib frame; missing: {missing}")
@@ -188,7 +217,7 @@ def to_qlib_frame(panel: pd.DataFrame) -> pd.DataFrame:
     df["instrument"] = "JP" + df["SecuritiesCode"].astype(int).astype(str)
     df = df.set_index(["datetime", "instrument"]).sort_index()
 
-    features = df[FEATURE_COLUMNS].copy()
+    features = df[columns].copy()
     label = df[[LABEL_COLUMN]].copy()
     features.columns = pd.MultiIndex.from_product([["feature"], features.columns])
     label.columns = pd.MultiIndex.from_product([["label"], label.columns])

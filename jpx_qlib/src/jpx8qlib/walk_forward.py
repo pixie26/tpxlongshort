@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 
 from .config import Config
-from .data import prepare_panel
-from .model import PublishedLGBM
+from .data import prepare_experiment_panel
+from .model import make_model
 from .parity import compare_predictions, write_report
 from .qlib_adapter import QlibPublishedModel, make_dataset
 from .ranking import add_rank
@@ -135,7 +135,7 @@ def _slice(panel: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp) -> pd.Da
     return panel.loc[dates.between(start, end, inclusive="both")].copy()
 
 
-def _predict_native(model: PublishedLGBM, frame: pd.DataFrame) -> pd.DataFrame:
+def _predict_native(model, frame: pd.DataFrame) -> pd.DataFrame:
     output = frame.copy()
     output["Prediction"] = model.predict(output).to_numpy()
     return output
@@ -261,6 +261,7 @@ def _fold_parity(
     native_metrics: dict,
     qlib_metrics: dict,
     ranking_mode: str,
+    prediction_tolerance: float = 0.0,
 ) -> dict:
     prediction = compare_predictions(native, qlib)
     key = ["Date", "SecuritiesCode"]
@@ -281,8 +282,12 @@ def _fold_parity(
         keys_identical
         and rank_merge["Rank_native"].eq(rank_merge["Rank_qlib"]).all()
     )
+    max_difference = float(prediction["max_abs_difference"])
     return {
         **prediction,
+        "prediction_tolerance": float(prediction_tolerance),
+        "prediction_exact": max_difference == 0.0,
+        "prediction_within_tolerance": max_difference <= prediction_tolerance,
         "keys_identical": keys_identical,
         "daily_rank_identical": ranks_identical,
         "metrics_identical": _metrics_equal(native_metrics, qlib_metrics),
@@ -431,6 +436,10 @@ def _write_combined_summary(output_dir: Path, native: dict, qlib: dict) -> dict:
         "all_fold_predictions_exact": all(
             row["max_abs_difference"] == 0.0 for row in parity_reports
         ),
+        "all_fold_predictions_within_tolerance": all(
+            row.get("prediction_within_tolerance", row["max_abs_difference"] == 0.0)
+            for row in parity_reports
+        ),
         "all_fold_ranks_identical": all(
             row["daily_rank_identical"] for row in parity_reports
         ),
@@ -439,9 +448,11 @@ def _write_combined_summary(output_dir: Path, native: dict, qlib: dict) -> dict:
         ),
         "folds": parity_reports,
     }
-    engineering["parity_passed"] = all(
-        value for key, value in engineering.items()
-        if key != "folds"
+    engineering["parity_passed"] = bool(
+        engineering["all_fold_keys_identical"]
+        and engineering["all_fold_predictions_within_tolerance"]
+        and engineering["all_fold_ranks_identical"]
+        and engineering["all_fold_metrics_identical"]
     )
     combined = {
         "run_role": "native_qlib_walk_forward",
@@ -479,7 +490,10 @@ def finalize_existing_walk_forward(config: Config) -> dict:
             parity["keys_identical"]
             and parity["daily_rank_identical"]
             and parity["metrics_identical"]
-            and parity["max_abs_difference"] == 0.0
+            and parity.get(
+                "prediction_within_tolerance",
+                parity["max_abs_difference"] == 0.0,
+            )
         ):
             raise AssertionError(f"{fold} parity is not exact")
 
@@ -507,7 +521,7 @@ def run_walk_forward(config: Config, mode: str, force_prepare: bool = False) -> 
     if mode not in {"native", "qlib"}:
         raise ValueError("mode must be 'native' or 'qlib'")
     started = perf_counter()
-    panel = prepare_panel(config, force=force_prepare)
+    panel = prepare_experiment_panel(config, force=force_prepare)
     folds = build_walk_forward_folds(panel, config)
     config.output_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(config.source_path, config.output_dir / "walk_forward.yaml")
@@ -533,15 +547,29 @@ def run_walk_forward(config: Config, mode: str, force_prepare: bool = False) -> 
         test = _slice(panel, fold.test_start, fold.test_end)
 
         if mode == "native":
-            model = PublishedLGBM(config.raw["model"]["params"])
+            model = make_model(
+                config.model_type,
+                config.raw["model"].get("params", {}),
+                config.feature_columns,
+                config.categorical_features,
+            )
             model.fit(train, valid)
             train_pred = _predict_native(model, train)
             valid_pred = _predict_native(model, valid)
             test_pred = _predict_native(model, test)
         else:
             bounded = _slice(panel, fold.train_start, fold.test_end)
-            dataset = make_dataset(bounded, fold.split_config())
-            model = QlibPublishedModel(config.raw["model"]["params"])
+            dataset = make_dataset(
+                bounded,
+                fold.split_config(),
+                feature_columns=config.feature_columns,
+            )
+            model = QlibPublishedModel(
+                config.raw["model"].get("params", {}),
+                model_type=config.model_type,
+                feature_columns=config.feature_columns,
+                categorical_features=config.categorical_features,
+            )
             model.fit(dataset)
             train_pred = _prediction_from_qlib(model, dataset, "train", train)
             valid_pred = _prediction_from_qlib(model, dataset, "valid", valid)
@@ -557,6 +585,9 @@ def run_walk_forward(config: Config, mode: str, force_prepare: bool = False) -> 
             role=f"{mode}_walk_forward_fold",
         )
         test_pred.to_pickle(fold_dir / f"{mode}_predictions.pkl.gz", compression="gzip")
+        valid_pred.to_pickle(
+            fold_dir / f"{mode}_valid_predictions.pkl.gz", compression="gzip"
+        )
         ranked.to_pickle(fold_dir / f"{mode}_ranked.pkl.gz", compression="gzip")
         daily.to_csv(fold_dir / f"{mode}_daily_spread.csv", header=True)
         write_report(metrics, fold_dir / f"{mode}_metrics.json")
@@ -574,13 +605,16 @@ def run_walk_forward(config: Config, mode: str, force_prepare: bool = False) -> 
                 json.loads(native_metrics_path.read_text(encoding="utf-8")),
                 metrics,
                 ranking_mode=config.raw["ranking"]["mode"],
+                prediction_tolerance=(
+                    1e-10 if config.model_type == "ridge" else 0.0
+                ),
             )
             write_report(parity, fold_dir / "prediction_parity.json")
             if not (
                 parity["keys_identical"]
                 and parity["daily_rank_identical"]
                 and parity["metrics_identical"]
-                and parity["max_abs_difference"] == 0.0
+                and parity["prediction_within_tolerance"]
             ):
                 raise AssertionError(f"{fold.name} Native/Qlib parity failed: {parity}")
         logger.info(

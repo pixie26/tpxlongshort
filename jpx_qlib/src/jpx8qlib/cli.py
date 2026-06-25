@@ -7,6 +7,7 @@ import sys
 
 import pandas as pd
 
+from .ablation_report import run_ablation_report, run_ablation_suite_report
 from .config import load_config
 from .data import load_raw_stock_prices, prepare_panel, select_parity_sample
 from .diagnostics import run_portfolio_diagnostics
@@ -104,6 +105,14 @@ def _parser() -> argparse.ArgumentParser:
         "strategy-experiments",
         help="Run controlled portfolio rules with nested walk-forward selection",
     )
+    sub.add_parser(
+        "ablation-report",
+        help="Evaluate baseline and smooth-3d portfolios for one completed ablation",
+    )
+    sub.add_parser(
+        "ablation-suite-report",
+        help="Aggregate completed ablations into paired CSV, JSON, and HTML reports",
+    )
 
     sub.add_parser(
         "feature-parity",
@@ -179,6 +188,18 @@ def main() -> None:
             run_strategy_experiments(cfg),
             indent=2,
             allow_nan=True,
+        ))
+    elif args.command == "ablation-report":
+        print(json.dumps(
+            run_ablation_report(cfg),
+            indent=2,
+            allow_nan=False,
+        ))
+    elif args.command == "ablation-suite-report":
+        print(json.dumps(
+            run_ablation_suite_report(cfg),
+            indent=2,
+            allow_nan=False,
         ))
     elif args.command == "feature-parity":
         raw = load_raw_stock_prices(cfg.stock_prices_csv)

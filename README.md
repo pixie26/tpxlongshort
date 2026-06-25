@@ -107,11 +107,11 @@
 
 | 项目 | 状态 | Findings |
 | --- | --- | --- |
-| B1 Remove SecuritiesCode | 待执行 | 尚无实验结论。重点观察训练期 Sharpe 是否大幅下降，以及 OOS 表现是否更稳定。 |
-| B2 Remove raw OHLC/Volume levels | 待执行 | 尚无实验结论。用于判断模型是否依赖不可跨股票泛化的价格和成交量尺度。 |
-| B3 Simple linear model | 待执行 | 尚无实验结论。用于区分线性可泛化信号与 LightGBM 的非线性记忆能力。 |
+| B1 Remove SecuritiesCode | 已完成 | Median train/OOS competition Sharpe gap 从 29.67 降至 12.47，说明股票身份是主要拟合来源之一；但 smooth3 的 OOS 指标没有全面改善，代码仍携带部分稳定横截面信息。 |
+| B2 Remove raw OHLC/Volume levels | 已完成 | 删除 code 和 OHLC 后，smooth3 median fold net Sharpe 提高至 0.55，4/5 folds 为正；继续删除 Volume 后 break-even 降至 4.29 bps，说明原始 Volume 仍包含有用信号或代理暴露。 |
+| B3 Simple linear model | 已完成 | Ridge 将 median train/OOS gap 降至 0.51；smooth3 median fold net Sharpe 为 0.92，worst fold 为 -0.44。LightGBM 的大部分训练拟合没有形成稳定 OOS 增量。 |
 
-**Phase B 结论：** 尚未开始；完成前不进入大规模特征扩展。
+**Phase B 结论：** 原模型存在明显的股票身份记忆和非线性过拟合。当前更可信的研究基线是无 code、无 OHLC 的简化特征组，并保留 Volume；Ridge 结果值得独立区间验证，但因其特征组由同一批 OOS folds 选出，暂不能视为最终 winner。
 
 ### Phase C｜改善特征表达
 
@@ -263,3 +263,42 @@ Qlib walk-forward 与组合回测的安装、配置和命令见
 
 - `jpx_qlib/outputs/walk_forward/portfolio_diagnostics/portfolio_diagnostics.html`
 - `jpx_qlib/outputs/walk_forward/strategy_experiments/strategy_experiments.html`
+
+## 第一轮特征与模型消融（2026-06-25）
+
+所有实验使用相同的五折 expanding walk-forward、相同 target、相同排名和
+`5 bps` 单程成本。每个模型只报告原 baseline portfolio 与固定 smooth3，
+没有重新搜索组合参数。
+
+| 实验 | Smooth3 median fold net Sharpe | Positive net folds | Worst fold net Sharpe | Break-even | Median train/OOS gap |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| A0 Baseline | 0.379 | 3/5 | -2.278 | 6.34 bps | 29.67 |
+| A1 No SecuritiesCode | 0.213 | 3/5 | -1.358 | 5.77 bps | 12.47 |
+| A2a No code / no OHLC | 0.551 | 4/5 | -1.040 | 6.88 bps | 12.92 |
+| A2b No code / no raw levels | 0.452 | 3/5 | -1.747 | 4.29 bps | 12.41 |
+| A3 Ridge on A2a features | 0.915 | 3/5 | -0.443 | 9.03 bps | 0.51 |
+| A4 Cross-sectional rank | 0.223 | 3/5 | -2.012 | 5.93 bps | 10.05 |
+
+Paired findings：
+
+1. A1 的训练 Sharpe 大幅下降，而 OOS 没有同比恶化，确认
+   `SecuritiesCode` 是原版高训练拟合的重要来源；但删除 code 会提高换手，
+   且并非每折都改善。
+2. A2a 在 smooth3 下相对 A0 改善 4/5 folds，并降低对 2020 的集中依赖。
+   原始 OHLC 绝对水平不是必要 alpha 来源。
+3. A2b 明显弱于 A2a。原始 Volume 不能直接归类为有害尺度，它可能包含流动性、
+   规模或可交易性信息，下一步应做更严格的相对 Volume 表达，而不是直接删除。
+4. A3 的训练/OOS gap 几乎消失，且 smooth3 的 worst fold 显著改善。这支持
+   “LightGBM 大量非线性拟合属于过拟合”的判断。但 A3 的特征组是在同一批 OOS
+   folds 上从 A1/A2 中选择的，因此该结果仍是诊断性证据，需要新的独立时间区间验证。
+5. A4 的 median Rank IC 较高，但 2020 占正贡献约 73%，并在 2021 H2 失效；
+   截面 rank 不能作为当前稳定 winner。
+
+Native/Qlib parity：
+
+- A0、A1、A2a、A2b、A4 predictions 精确一致；
+- A3 Ridge 最大预测差为 `2.32e-12`，daily ranks 和 metrics 完全一致。
+
+主报告：
+
+- `jpx_qlib/outputs/ablations/report/ablation_report.html`

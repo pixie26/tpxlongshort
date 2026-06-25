@@ -289,3 +289,31 @@ Detailed reports:
 
 - `outputs/walk_forward/portfolio_diagnostics/portfolio_diagnostics.html`
 - `outputs/walk_forward/strategy_experiments/strategy_experiments.html`
+
+## Feature and model ablations
+
+Independent configs are under `configs/ablations/`. Run Native first, then
+Qlib parity, and finally the fixed portfolio report:
+
+```powershell
+jpx8 --config configs/ablations/a1_no_security_code.yaml native-walk-forward
+D:\anaconda3\envs\qlib\python.exe -m jpx8qlib.cli `
+  --config configs/ablations/a1_no_security_code.yaml qlib-walk-forward
+jpx8 --config configs/ablations/a1_no_security_code.yaml ablation-report
+jpx8 --config configs/ablations/suite.yaml ablation-suite-report
+```
+
+The first-round matrix contains A0 baseline, A1 no security code, A2a no code
+and no OHLC, A2b no code and no raw OHLCV levels, A3 Ridge on the A2a feature
+group, and A4 daily cross-sectional percentile ranks.
+
+The strongest paired diagnostic is A3 Ridge with fixed smooth3: median fold net
+Sharpe `0.915`, worst fold `-0.443`, break-even cost `9.03 bps`, and median
+train/OOS gap `0.51`. This is not an independently validated winner because
+the A2a feature group was selected using the same OOS fold set. A2a is the
+strongest LightGBM simplification: it improves smooth3 net Sharpe in 4/5 folds.
+Removing Volume as well causes a material deterioration.
+
+Report:
+
+- `outputs/ablations/report/ablation_report.html`

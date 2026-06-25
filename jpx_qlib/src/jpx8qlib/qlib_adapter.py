@@ -6,7 +6,7 @@ import pandas as pd
 
 from .constants import FEATURE_COLUMNS, LABEL_COLUMN
 from .data import to_qlib_frame
-from .model import PublishedLGBM
+from .model import make_model
 
 
 def require_qlib() -> dict[str, Any]:
@@ -20,9 +20,13 @@ def require_qlib() -> dict[str, Any]:
     return {"DatasetH": DatasetH, "DataHandlerLP": DataHandlerLP}
 
 
-def make_dataset(panel: pd.DataFrame, split_cfg: dict):
+def make_dataset(
+    panel: pd.DataFrame,
+    split_cfg: dict,
+    feature_columns: list[str] | None = None,
+):
     q = require_qlib()
-    qframe = to_qlib_frame(panel)
+    qframe = to_qlib_frame(panel, feature_columns=feature_columns)
     handler = q["DataHandlerLP"].from_df(qframe)
     segments = {
         "train": (split_cfg["train_start"], split_cfg["train_end"]),
@@ -51,9 +55,26 @@ def _flat_from_qlib(data: pd.DataFrame) -> pd.DataFrame:
 class QlibPublishedModel:
     """Qlib-compatible wrapper around the published LightGBM baseline."""
 
-    def __init__(self, params: dict | None = None):
+    def __init__(
+        self,
+        params: dict | None = None,
+        *,
+        model_type: str = "lightgbm",
+        feature_columns: list[str] | None = None,
+        categorical_features: list[str] | None = None,
+    ):
         self.params = params or {}
-        self.model = PublishedLGBM(self.params)
+        self.model_type = model_type
+        self.feature_columns = list(feature_columns or FEATURE_COLUMNS)
+        self.categorical_features = list(
+            categorical_features or ["SecuritiesCode", "SupervisionFlag"]
+        )
+        self.model = make_model(
+            self.model_type,
+            self.params,
+            self.feature_columns,
+            self.categorical_features,
+        )
 
     def fit(self, dataset, **kwargs):
         q = require_qlib()

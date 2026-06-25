@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JPX Feature and Model Ablations</title>
+  <style>
+    :root{color-scheme:dark;background:#09101e;color:#e8eefb;font:14px/1.45 system-ui,sans-serif}
+    body{max-width:1500px;margin:auto;padding:28px}h1{margin-bottom:4px}.muted{color:#9aa8c2}
+    table{width:100%;border-collapse:collapse;background:#111a2d;border:1px solid #263452;border-radius:10px;overflow:hidden}
+    th,td{padding:8px 9px;border-bottom:1px solid #263452;text-align:right;white-space:nowrap}
+    th:first-child,td:first-child{text-align:left}.section{margin-top:28px;overflow:auto}
+    .good{color:#55d6a5}.bad{color:#ff8795}
+  </style>
+</head>
+<body>
+  <h1>JPX Feature and Model Ablations</h1>
+  <div class="muted">Five-fold paired comparison. Portfolio rules are fixed to baseline and smooth 3d; 5 bps one-way cost.</div>
+  <p class="muted" id="caveat"></p>
+  <div class="section"><h2>Summary</h2><table id="summary"></table></div>
+  <div class="section"><h2>Native / Qlib parity</h2><table id="parity"></table></div>
+<script>
+const DATA=__ABLATION_PAYLOAD__;
+document.getElementById("caveat").textContent=DATA.findings.model_complexity;
+const n=x=>Number(x).toFixed(3), p=x=>(100*Number(x)).toFixed(1)+"%";
+function draw(id,rows,cols){document.getElementById(id).innerHTML="<thead><tr>"+
+ cols.map(c=>`<th>${c[1]}</th>`).join("")+"</tr></thead><tbody>"+
+ rows.map(r=>"<tr>"+cols.map(c=>`<td>${c[2]?c[2](r[c[0]]):r[c[0]]}</td>`).join("")+"</tr>").join("")+"</tbody>"}
+draw("summary",DATA.summary,[["Variant","Variant"],["Portfolio","Portfolio"],
+ ["MedianFoldGrossSharpe","Median gross",n],["MedianFoldNetSharpe","Median net",n],
+ ["PositiveNetFolds","Positive net folds"],["WorstFoldNetSharpe","Worst net",n],
+ ["BreakEvenCostBps","Break-even bps",n],["AverageTradedNotional","Traded notional",n],
+ ["MedianRankIC","Median Rank IC",n],["PositiveContributionShare2020","2020 positive share",p],
+ ["MedianInSampleOOSGap","Train/OOS gap",n],["NetSharpe","Stitched net",n]]);
+draw("parity",DATA.parity,[["Variant","Variant"],["PredictionExact","Prediction exact"],
+ ["PredictionWithinTolerance","Within tolerance"],["RankExact","Rank exact"],
+ ["MetricsExact","Metrics exact"],["MaxPredictionDifference","Max prediction diff",x=>Number(x).toExponential(2)]]);
+</script>
+</body>
+</html>

@@ -6,6 +6,8 @@ from typing import Any
 
 import yaml
 
+from .constants import FEATURE_COLUMNS
+
 
 @dataclass(frozen=True)
 class Config:
@@ -14,6 +16,9 @@ class Config:
 
     @property
     def project_root(self) -> Path:
+        for parent in self.source_path.parents:
+            if (parent / "pyproject.toml").is_file():
+                return parent.resolve()
         return self.source_path.parent.parent.resolve()
 
     @property
@@ -49,6 +54,44 @@ class Config:
             return {}
         if not isinstance(value, dict):
             raise ValueError("parity config must be a mapping")
+        return value
+
+    @property
+    def feature_columns(self) -> list[str]:
+        value = self.raw.get("features", {}).get("columns", FEATURE_COLUMNS)
+        if not isinstance(value, list) or not value:
+            raise ValueError("features.columns must be a non-empty list")
+        columns = [str(column) for column in value]
+        if len(columns) != len(set(columns)):
+            raise ValueError("features.columns contains duplicates")
+        return columns
+
+    @property
+    def feature_transform(self) -> str:
+        value = str(
+            self.raw.get("features", {}).get("cross_sectional_transform", "none")
+        )
+        if value not in {"none", "percentile_rank"}:
+            raise ValueError(
+                "features.cross_sectional_transform must be 'none' or "
+                "'percentile_rank'"
+            )
+        return value
+
+    @property
+    def categorical_features(self) -> list[str]:
+        configured = self.raw.get("features", {}).get(
+            "categorical", ["SecuritiesCode", "SupervisionFlag"]
+        )
+        if not isinstance(configured, list):
+            raise ValueError("features.categorical must be a list")
+        return [str(column) for column in configured if str(column) in self.feature_columns]
+
+    @property
+    def model_type(self) -> str:
+        value = str(self.raw.get("model", {}).get("type", "lightgbm")).lower()
+        if value not in {"lightgbm", "ridge"}:
+            raise ValueError("model.type must be 'lightgbm' or 'ridge'")
         return value
 
 

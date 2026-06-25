@@ -1,0 +1,12 @@
+project:
+  name: ablation_suite
+  output_dir: outputs/ablations/report
+
+ablation_suite:
+  configs:
+    - configs/ablations/a0_baseline.yaml
+    - configs/ablations/a1_no_security_code.yaml
+    - configs/ablations/a2a_no_code_no_ohlc.yaml
+    - configs/ablations/a2b_no_raw_levels.yaml
+    - configs/ablations/a3_ridge.yaml
+    - configs/ablations/a4_cross_section_rank.yaml

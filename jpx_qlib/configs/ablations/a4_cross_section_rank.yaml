@@ -1,0 +1,30 @@
+project: {name: a4_cross_section_rank, output_dir: outputs/ablations/a4_cross_section_rank}
+data:
+  stock_prices_csv: D:/projects/jpx/data/raw/jpx/train_files/stock_prices.csv
+  legacy_code_dir: D:/projects/jpx/JPXTokyoStockExchangePrediction/winner-models/8th
+  feature_engine: legacy_optimized
+  cache_file: ../../jpx8_published_baseline/prepared_panel.pkl.gz
+features:
+  columns: [Open, High, Low, Close, Volume, AdjustmentFactor, ExpectedDividend,
+    SupervisionFlag, Amplitude, OpenCloseReturn, Return, Volatility10,
+    Volatility30, Volatility50, CloseSMA3, CloseSMA5, CloseSMA10, CloseSMA30,
+    ReturnSMA3, ReturnSMA5, ReturnSMA10, ReturnSMA30]
+  categorical: [SupervisionFlag]
+  cross_sectional_transform: percentile_rank
+model:
+  type: lightgbm
+  params: {objective: regression, n_estimators: 100, learning_rate: 0.1,
+    num_leaves: 31, max_depth: -1, min_child_samples: 20, subsample: 1.0,
+    colsample_bytree: 1.0, reg_alpha: 0.0, reg_lambda: 0.0, random_state: 42,
+    n_jobs: -1, verbosity: -1}
+ranking: {mode: corrected_rank, top_n: 200, weight_first: 2.0, weight_last: 1.0}
+evaluation: {annualization_days: 252}
+ablation: {id: A4, label: Cross-sectional percentile rank, portfolio_cost_bps: 5}
+walk_forward:
+  purge_days: 2
+  folds:
+    - {name: fold_01, train: ['2017-01-04', '2018-12-31'], valid: ['2019-01-01', '2019-06-30'], test: ['2019-07-01', '2019-12-31']}
+    - {name: fold_02, train: ['2017-01-04', '2019-06-30'], valid: ['2019-07-01', '2019-12-31'], test: ['2020-01-01', '2020-06-30']}
+    - {name: fold_03, train: ['2017-01-04', '2019-12-31'], valid: ['2020-01-01', '2020-06-30'], test: ['2020-07-01', '2020-12-31']}
+    - {name: fold_04, train: ['2017-01-04', '2020-06-30'], valid: ['2020-07-01', '2020-12-31'], test: ['2021-01-01', '2021-06-30']}
+    - {name: fold_05, train: ['2017-01-04', '2020-12-31'], valid: ['2021-01-01', '2021-06-30'], test: ['2021-07-01', '2021-12-03']}
