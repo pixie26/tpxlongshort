@@ -1,0 +1,10 @@
+project:
+  name: feature_research_c3
+  output_dir: outputs/feature_research/report_c3
+
+ablation_suite:
+  baseline_variant: A2a
+  configs:
+    - configs/ablations/a2a_no_code_no_ohlc.yaml
+    - configs/feature_research/c3a_relative_price.yaml
+    - configs/feature_research/c3b_normalized_volume.yaml

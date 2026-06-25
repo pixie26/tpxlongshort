@@ -18,6 +18,7 @@
   <div class="muted">Five-fold paired comparison. Portfolio rules are fixed to baseline and smooth 3d; 5 bps one-way cost.</div>
   <p class="muted" id="caveat"></p>
   <div class="section"><h2>Summary</h2><table id="summary"></table></div>
+  <div class="section"><h2>Stability gate diagnostics</h2><table id="gates"></table></div>
   <div class="section"><h2>Native / Qlib parity</h2><table id="parity"></table></div>
 <script>
 const DATA=__ABLATION_PAYLOAD__;
@@ -32,6 +33,13 @@ draw("summary",DATA.summary,[["Variant","Variant"],["Portfolio","Portfolio"],
  ["BreakEvenCostBps","Break-even bps",n],["AverageTradedNotional","Traded notional",n],
  ["MedianRankIC","Median Rank IC",n],["PositiveContributionShare2020","2020 positive share",p],
  ["MedianInSampleOOSGap","Train/OOS gap",n],["NetSharpe","Stitched net",n]]);
+draw("gates",DATA.gates||[],[["Variant","Variant"],
+ ["ImprovedNetSharpeFolds","Improved folds"],
+ ["AtLeastThreeImprovedFolds",">=3 folds"],["MedianNetSharpeImproved","Median net"],
+ ["MedianBreakEvenNotLower","Break-even"],["WorstFoldWithinTolerance","Worst fold"],
+ ["TrainOOSGapNotWider","Train/OOS gap"],
+ ["Contribution2020NotMoreConcentrated","2020 concentration"],
+ ["PassesAllStabilityGates","Passes all"]]);
 draw("parity",DATA.parity,[["Variant","Variant"],["PredictionExact","Prediction exact"],
  ["PredictionWithinTolerance","Within tolerance"],["RankExact","Rank exact"],
  ["MetricsExact","Metrics exact"],["MaxPredictionDifference","Max prediction diff",x=>Number(x).toExponential(2)]]);

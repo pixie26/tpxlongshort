@@ -1,0 +1,9 @@
+project:
+  name: c2_sector_diagnostics
+  output_dir: outputs/feature_research/c2_sector_diagnostics
+
+sector_diagnostics:
+  source_config: configs/ablations/a2a_no_code_no_ohlc.yaml
+  stock_list_csv: D:/projects/jpx/data/raw/jpx/stock_list.csv
+  methods: [raw, sector_demean, sector_rank]
+  cost_bps: 5

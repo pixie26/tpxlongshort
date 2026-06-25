@@ -124,12 +124,15 @@
 
 | 项目 | 状态 | Findings |
 | --- | --- | --- |
-| C1 Cross-sectional rank normalization | 待执行 | 尚无实验结论。 |
-| C2 Sector-neutral features/predictions | 待执行 | 尚无实验结论；需要先接入可靠的行业分类并检查时间可用性。 |
-| C3 Relative price/normalized volume | 待执行 | 尚无实验结论。目标是消除绝对价格和成交量尺度依赖。 |
-| C4 New feature groups | 待执行 | 尚无实验结论；每组特征必须单独消融，不一次混合多个改动。 |
+| C1 Cross-sectional rank normalization | 已完成 | A4 的 smooth3 median fold net Sharpe 为 0.22，2020 正贡献占比约 73%，未形成稳定改善。 |
+| C2 Sector-neutral features/predictions | 已完成（诊断） | 静态 33-sector 去均值将 smooth3 median net Sharpe 从 0.55 降至 -0.17；行业内 rank 降至 -0.93。行业净敞口下降，但 alpha 和 break-even 同时显著下降。 |
+| C3 Relative price/normalized volume | 已完成 | C3a、C3b 均未通过预注册稳定性门槛，因此未运行 C3c。相对价格提高部分毛指标，但成本后 median 与 break-even 均下降。 |
+| C4 New feature groups | 已完成 | Momentum、volatility/range、liquidity 三组分别消融，均未通过全部门槛，不生成 `c4_selected`。 |
 
-**Phase C 结论：** 等待 Phase B 确认原版高 in-sample Sharpe 的来源。
+**Phase C 结论：** 继续保留 A2a LightGBM 作为当前非线性研究 reference。没有任何
+C3/C4 特征组在多数 folds、median、break-even、worst fold、train/OOS gap 和
+2020 集中度上同时改善。Ridge 仍是重要复杂度诊断，但不替代 LightGBM 的后续
+factor 研究基线。
 
 ### Phase D｜训练方法
 
@@ -302,3 +305,58 @@ Native/Qlib parity：
 主报告：
 
 - `jpx_qlib/outputs/ablations/report/ablation_report.html`
+
+## Phase C 特征表达与行业诊断（2026-06-25）
+
+本轮固定使用 A2a LightGBM 作为 C0：删除 `SecuritiesCode` 和 OHLC 原始水平，
+保留原始 Volume。模型参数、五折 walk-forward、Top/Bottom 200、50/50 gross、
+`5 bps` 单程成本以及 raw/smooth3 组合均不重新搜索。
+
+### C3/C4 单组消融
+
+以下均为 smooth3；break-even 为五折中位数。`Improved folds` 是相对 C0 的
+5 bps Net Sharpe paired improvement count。
+
+| Variant | Median fold net Sharpe | Improved folds | Positive folds | Worst fold | Median break-even | Train/OOS gap | 2020 positive share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| C0 / A2a | 0.551 | — | 4/5 | -1.040 | 7.68 bps | 12.92 | 44.1% |
+| C3a Relative price | 0.244 | 3/5 | 3/5 | -0.769 | 5.49 bps | 11.96 | 57.4% |
+| C3b Normalized Volume | 0.312 | 2/5 | 3/5 | -1.255 | 6.45 bps | 13.34 | 43.4% |
+| C4a Momentum/reversal | 0.470 | 2/5 | 4/5 | -0.760 | 7.62 bps | 12.54 | 61.7% |
+| C4b Volatility/range | 0.572 | 2/5 | 3/5 | -1.111 | 6.29 bps | 13.43 | 48.8% |
+| C4c Liquidity dynamics | 0.542 | 2/5 | 3/5 | -1.550 | 7.58 bps | 13.43 | 34.2% |
+
+预注册门槛要求至少 3/5 folds 改善、median net 提高、median break-even 不下降、
+worst fold 不低于 C0 超过 0.25、train/OOS gap 不扩大且 2020 集中度不增加。
+没有 variant 全部通过：
+
+1. C3a 虽改善 3/5 folds，并显著改善 worst fold，但 median net、break-even 和
+   2020 集中度失败。其较好的 stitched gross 不能解释为成本后稳定改进。
+2. C3b 未证明用这一组 normalized Volume 替换原 Volume 有益。
+3. C4a 的改善偏向早期区间，2020 集中度升至 61.7%，fold 5 毛信号转负。
+4. C4b 仅有 median net 小幅提高，其余关键稳定性指标恶化。
+5. C4c 降低 2020 集中度，但 paired coverage、worst fold 和 gap 不合格。
+6. 因 C3a/C3b 均未通过，按预先规则没有运行 C3c；也没有生成 `c4_selected`。
+
+### C2 静态行业中性化诊断
+
+行业分类来自比赛提供的 `stock_list.csv`，其 `EffectiveDate` 为
+`2021-12-30`。这不是严格 point-in-time 的历史行业分类，可能存在分类漂移，
+因此结果只作为 prediction 层诊断，不回写训练特征。
+
+| Prediction transform | Smooth3 median net Sharpe | Positive folds | Median break-even | Median sector net-gross | Median max sector exposure |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Raw | 0.551 | 4/5 | 7.68 bps | 0.329 | 0.060 |
+| 33-sector demean | -0.166 | 2/5 | 4.36 bps | 0.153 | 0.028 |
+| 33-sector percentile rank | -0.929 | 0/5 | 2.50 bps | 0.140 | 0.018 |
+
+简单行业中性化确实降低行业集中度，但损失的毛收益和单位换手 alpha 更多。
+当前不能把 A2a 收益全部解释为纯个股 alpha，但也不应采用机械行业去均值或
+行业内 rank。所有 C3/C4 Native/Qlib daily ranks、metrics 和 portfolio
+accounting 均一致；C4c 最大预测差低于 `1e-15`。
+
+报告：
+
+- `jpx_qlib/outputs/feature_research/report_c3/ablation_report.html`
+- `jpx_qlib/outputs/feature_research/report_c4/ablation_report.html`
+- `jpx_qlib/outputs/feature_research/c2_sector_diagnostics/sector_diagnostics.html`

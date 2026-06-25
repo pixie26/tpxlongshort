@@ -15,6 +15,7 @@ from .features import build_legacy_optimized_features
 from .legacy import build_legacy_features
 from .parity import compare_frames, compare_predictions, write_report
 from .portfolio import run_portfolio_backtest
+from .sector_diagnostics import run_sector_diagnostics
 from .strategy_experiments import run_strategy_experiments
 from .workflow import run_native, run_qlib
 from .walk_forward import run_walk_forward
@@ -113,6 +114,10 @@ def _parser() -> argparse.ArgumentParser:
         "ablation-suite-report",
         help="Aggregate completed ablations into paired CSV, JSON, and HTML reports",
     )
+    sub.add_parser(
+        "sector-diagnostics",
+        help="Compare raw and static-sector-neutral prediction transforms",
+    )
 
     sub.add_parser(
         "feature-parity",
@@ -198,6 +203,12 @@ def main() -> None:
     elif args.command == "ablation-suite-report":
         print(json.dumps(
             run_ablation_suite_report(cfg),
+            indent=2,
+            allow_nan=False,
+        ))
+    elif args.command == "sector-diagnostics":
+        print(json.dumps(
+            run_sector_diagnostics(cfg),
             indent=2,
             allow_nan=False,
         ))

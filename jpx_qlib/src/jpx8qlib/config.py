@@ -67,6 +67,26 @@ class Config:
         return columns
 
     @property
+    def feature_groups(self) -> list[str]:
+        value = self.raw.get("features", {}).get("groups", [])
+        if not isinstance(value, list):
+            raise ValueError("features.groups must be a list")
+        groups = [str(group) for group in value]
+        supported = {
+            "relative_price",
+            "normalized_volume",
+            "momentum_reversal",
+            "volatility_range",
+            "liquidity_dynamics",
+        }
+        unknown = sorted(set(groups) - supported)
+        if unknown:
+            raise ValueError(f"Unsupported features.groups: {unknown}")
+        if len(groups) != len(set(groups)):
+            raise ValueError("features.groups contains duplicates")
+        return groups
+
+    @property
     def feature_transform(self) -> str:
         value = str(
             self.raw.get("features", {}).get("cross_sectional_transform", "none")

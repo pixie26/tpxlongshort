@@ -317,3 +317,29 @@ Removing Volume as well causes a material deterioration.
 Report:
 
 - `outputs/ablations/report/ablation_report.html`
+
+## Controlled feature research
+
+The next LightGBM round keeps A2a as the fixed reference and changes one
+feature group at a time. Configs are under `configs/feature_research/`.
+
+```powershell
+jpx8 --config configs/feature_research/c3a_relative_price.yaml native-walk-forward
+jpx8 --config configs/feature_research/c3a_relative_price.yaml qlib-walk-forward
+jpx8 --config configs/feature_research/c3a_relative_price.yaml ablation-report
+jpx8 --config configs/feature_research/suite_c3.yaml ablation-suite-report
+jpx8 --config configs/feature_research/c2_sector_diagnostics.yaml sector-diagnostics
+```
+
+C3a relative price and C3b normalized Volume both failed the fixed stability
+gates, so C3c was not run. C4 momentum/reversal, volatility/range, and
+liquidity dynamics also failed; no `c4_selected` config was produced. The
+static-sector diagnostics reduce sector exposure materially but worsen
+smooth3 median net Sharpe and break-even cost. The sector classification is
+the supplied `2021-12-30` snapshot and is not point-in-time.
+
+Reports:
+
+- `outputs/feature_research/report_c3/ablation_report.html`
+- `outputs/feature_research/report_c4/ablation_report.html`
+- `outputs/feature_research/c2_sector_diagnostics/sector_diagnostics.html`

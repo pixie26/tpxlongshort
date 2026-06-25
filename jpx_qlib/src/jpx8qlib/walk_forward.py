@@ -605,8 +605,11 @@ def run_walk_forward(config: Config, mode: str, force_prepare: bool = False) -> 
                 json.loads(native_metrics_path.read_text(encoding="utf-8")),
                 metrics,
                 ranking_mode=config.raw["ranking"]["mode"],
-                prediction_tolerance=(
-                    1e-10 if config.model_type == "ridge" else 0.0
+                prediction_tolerance=float(
+                    config.parity_config.get(
+                        "prediction_tolerance",
+                        1e-10 if config.model_type == "ridge" else 0.0,
+                    )
                 ),
             )
             write_report(parity, fold_dir / "prediction_parity.json")

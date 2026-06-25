@@ -10,7 +10,7 @@ import pandas as pd
 
 from .config import Config
 from .constants import FEATURE_COLUMNS, LABEL_COLUMN
-from .features import build_legacy_optimized_features
+from .features import add_experiment_feature_groups, build_legacy_optimized_features
 from .legacy import build_legacy_features
 
 logger = logging.getLogger(__name__)
@@ -182,13 +182,17 @@ def prepare_experiment_panel(config: Config, force: bool = False) -> pd.DataFram
 
 
 def apply_experiment_features(panel: pd.DataFrame, config: Config) -> pd.DataFrame:
-    missing = [column for column in config.feature_columns if column not in panel.columns]
+    transformed = add_experiment_feature_groups(panel, config.feature_groups)
+    missing = [
+        column for column in config.feature_columns
+        if column not in transformed.columns
+    ]
     if missing:
         raise ValueError(f"Experiment feature columns missing from panel: {missing}")
     if config.feature_transform == "none":
-        return panel
+        return transformed
 
-    transformed = panel.copy()
+    transformed = transformed.copy()
     rank_columns = [
         column
         for column in config.feature_columns

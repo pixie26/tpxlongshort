@@ -1,0 +1,11 @@
+project:
+  name: feature_research_c4
+  output_dir: outputs/feature_research/report_c4
+
+ablation_suite:
+  baseline_variant: A2a
+  configs:
+    - configs/ablations/a2a_no_code_no_ohlc.yaml
+    - configs/feature_research/c4a_momentum.yaml
+    - configs/feature_research/c4b_volatility.yaml
+    - configs/feature_research/c4c_liquidity.yaml

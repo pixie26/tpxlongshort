@@ -87,6 +87,8 @@ def run_ablation_report(config: Config) -> dict[str, Any]:
                 ),
                 "BreakEvenCostBps": float(summary["break_even_cost_bps"]),
                 "NetMaxDrawdown": float(summary["net_max_drawdown"]),
+                "LongContribution": float(summary["long_contribution_sum"]),
+                "ShortContribution": float(summary["short_contribution_sum"]),
                 **model_row.drop(labels=["Fold"]).to_dict(),
             })
 
@@ -119,6 +121,12 @@ def run_ablation_report(config: Config) -> dict[str, Any]:
             "FeatureTransform": config.feature_transform,
             "MedianFoldGrossSharpe": float(portfolio_folds["GrossSharpe"].median()),
             "MedianFoldNetSharpe": float(portfolio_folds["NetSharpe"].median()),
+            "MedianFoldBreakEvenCostBps": float(
+                portfolio_folds["BreakEvenCostBps"].median()
+            ),
+            "MedianFoldTradedNotional": float(
+                portfolio_folds["AverageTradedNotional"].median()
+            ),
             "PositiveGrossFolds": int((portfolio_folds["GrossSharpe"] > 0).sum()),
             "PositiveNetFolds": int((portfolio_folds["NetSharpe"] > 0).sum()),
             "MeanRankIC": float(model_metrics["RankIC"].mean()),
@@ -158,6 +166,7 @@ def run_ablation_report(config: Config) -> dict[str, Any]:
         "label": label,
         "model_type": config.model_type,
         "feature_columns": config.feature_columns,
+        "feature_groups": config.feature_groups,
         "categorical_features": config.categorical_features,
         "cross_sectional_transform": config.feature_transform,
         "portfolio_cost_bps": cost_bps,
@@ -172,7 +181,12 @@ def run_ablation_report(config: Config) -> dict[str, Any]:
     return report
 
 
-def build_suite_report(config_paths: list[Path], output_dir: Path) -> dict[str, Any]:
+def build_suite_report(
+    config_paths: list[Path],
+    output_dir: Path,
+    *,
+    baseline_variant: str = "A0",
+) -> dict[str, Any]:
     summaries = []
     folds = []
     parity_rows = []
@@ -209,7 +223,32 @@ def build_suite_report(config_paths: list[Path], output_dir: Path) -> dict[str, 
         })
     summary = pd.concat(summaries, ignore_index=True)
     fold = pd.concat(folds, ignore_index=True)
-    baseline = fold.loc[fold["Variant"].eq("A0")].set_index(["Fold", "Portfolio"])
+    fold_medians = (
+        fold.groupby(["Variant", "Portfolio"], as_index=False)
+        .agg(
+            MedianFoldBreakEvenCostBps=("BreakEvenCostBps", "median"),
+            MedianFoldTradedNotional=("AverageTradedNotional", "median"),
+        )
+    )
+    summary = summary.drop(
+        columns=[
+            "MedianFoldBreakEvenCostBps",
+            "MedianFoldTradedNotional",
+        ],
+        errors="ignore",
+    ).merge(
+        fold_medians,
+        on=["Variant", "Portfolio"],
+        how="left",
+        validate="one_to_one",
+    )
+    if baseline_variant not in set(fold["Variant"]):
+        raise ValueError(
+            f"Baseline variant {baseline_variant!r} is not present in suite"
+        )
+    baseline = fold.loc[
+        fold["Variant"].eq(baseline_variant)
+    ].set_index(["Fold", "Portfolio"])
     paired = fold.copy()
     for metric in (
         "GrossSharpe", "NetSharpe", "RankIC", "AverageTradedNotional",
@@ -228,17 +267,53 @@ def build_suite_report(config_paths: list[Path], output_dir: Path) -> dict[str, 
     parity_table = pd.DataFrame(parity_rows)
     parity_table.to_csv(output_dir / "ablation_parity.csv", index=False)
     smooth = summary.loc[summary["Portfolio"].eq("smooth_3d")].set_index("Variant")
-    report = {
-        "run_role": "feature_model_ablation_suite",
-        "selection_rule": (
-            "Prefer majority fold improvement, higher medians and break-even cost, "
-            "non-worse worst fold, and a smaller in-sample/OOS gap; aggregate Sharpe "
-            "is diagnostic only."
-        ),
-        "summary": _records(summary),
-        "paired_changes": _records(paired),
-        "parity": _records(parity_table),
-        "findings": {
+    baseline_smooth = smooth.loc[baseline_variant]
+    gate_rows = []
+    for variant, variant_summary in smooth.iterrows():
+        paired_smooth = paired.loc[
+            paired["Variant"].eq(variant)
+            & paired["Portfolio"].eq("smooth_3d")
+        ]
+        if variant == baseline_variant:
+            improved_folds = 0
+        else:
+            improved_folds = int((paired_smooth["DeltaNetSharpe"] > 0).sum())
+        gates = {
+            "AtLeastThreeImprovedFolds": improved_folds >= 3,
+            "MedianNetSharpeImproved": (
+                float(variant_summary["MedianFoldNetSharpe"])
+                > float(baseline_smooth["MedianFoldNetSharpe"])
+            ),
+            "MedianBreakEvenNotLower": (
+                float(variant_summary["MedianFoldBreakEvenCostBps"])
+                >= float(baseline_smooth["MedianFoldBreakEvenCostBps"])
+            ),
+            "WorstFoldWithinTolerance": (
+                float(variant_summary["WorstFoldNetSharpe"])
+                >= float(baseline_smooth["WorstFoldNetSharpe"]) - 0.25
+            ),
+            "TrainOOSGapNotWider": (
+                float(variant_summary["MedianInSampleOOSGap"])
+                <= float(baseline_smooth["MedianInSampleOOSGap"])
+            ),
+            "Contribution2020NotMoreConcentrated": (
+                float(variant_summary["PositiveContributionShare2020"])
+                <= float(baseline_smooth["PositiveContributionShare2020"])
+            ),
+        }
+        gate_rows.append({
+            "Variant": variant,
+            "BaselineVariant": baseline_variant,
+            "ImprovedNetSharpeFolds": improved_folds,
+            **gates,
+            "PassesAllStabilityGates": bool(
+                variant != baseline_variant and all(gates.values())
+            ),
+        })
+    gate_table = pd.DataFrame(gate_rows)
+    gate_table.to_csv(output_dir / "ablation_stability_gates.csv", index=False)
+    if {"A0", "A3"}.issubset(smooth.index):
+        findings = {
             "security_code": (
                 "Removing SecuritiesCode materially reduced the median train/OOS "
                 "gap, but did not improve every OOS fold and increased turnover."
@@ -262,7 +337,33 @@ def build_suite_report(config_paths: list[Path], output_dir: Path) -> dict[str, 
                 "A4 retained substantial 2020 concentration and deteriorated in "
                 "later folds; it is not the stable winner."
             ),
-        },
+        }
+    else:
+        passing = gate_table.loc[
+            gate_table["PassesAllStabilityGates"], "Variant"
+        ].astype(str).tolist()
+        findings = {
+            "model_complexity": (
+                f"Reference is {baseline_variant}. Stability gates are fixed before "
+                "reviewing aggregate results; stitched Sharpe is diagnostic only."
+            ),
+            "stability_gate_result": (
+                "Passing variants: " + (", ".join(passing) if passing else "none")
+            ),
+        }
+    report = {
+        "run_role": "feature_model_ablation_suite",
+        "baseline_variant": baseline_variant,
+        "selection_rule": (
+            "Prefer majority fold improvement, higher medians and break-even cost, "
+            "non-worse worst fold, and a smaller in-sample/OOS gap; aggregate Sharpe "
+            "is diagnostic only."
+        ),
+        "summary": _records(summary),
+        "paired_changes": _records(paired),
+        "parity": _records(parity_table),
+        "stability_gates": _records(gate_table),
+        "findings": findings,
     }
     (output_dir / "summary.json").write_text(
         json.dumps(report, indent=2, allow_nan=False), encoding="utf-8"
@@ -272,6 +373,7 @@ def build_suite_report(config_paths: list[Path], output_dir: Path) -> dict[str, 
         "summary": _records(summary),
         "paired": _records(paired),
         "parity": _records(parity_table),
+        "gates": _records(gate_table),
         "findings": report["findings"],
     }
     (output_dir / "ablation_report.html").write_text(
@@ -296,4 +398,8 @@ def run_ablation_suite_report(config: Config) -> dict[str, Any]:
         paths.append(path)
     if not paths:
         raise ValueError("ablation_suite.configs must be non-empty")
-    return build_suite_report(paths, config.output_dir)
+    return build_suite_report(
+        paths,
+        config.output_dir,
+        baseline_variant=str(options.get("baseline_variant", "A0")),
+    )
